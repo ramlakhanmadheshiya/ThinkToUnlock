@@ -1,189 +1,235 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Modal, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Modal, TouchableWithoutFeedback } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { BrutalCard, BrutalButton, BrutalIconButton, Heading, Pill } from '../../src/components/Brutal';
+import { BrutalCard, BrutalButton, BrutalIconButton, Heading } from '../../src/components/Brutal';
 import { useAppState } from '../../src/store/StateContext';
 import { MOCK_APPS } from '../../src/data/mockApps';
-import { colors, shadow } from '../../src/theme';
+import { colors, shadow, radius } from '../../src/theme';
+
+type WarnKind = 'open-no-time' | 'plus-no-wallet' | null;
 
 export default function HomeTab() {
   const router = useRouter();
   const { state } = useAppState();
-  const [warnApp, setWarnApp] = useState<string | null>(null);
+  const [warn, setWarn] = useState<{ kind: WarnKind; appId?: string }>({ kind: null });
 
   const lockedApps = useMemo(
     () => MOCK_APPS.filter((a) => state.apps[a.id]?.locked),
     [state.apps]
   );
 
-  const totalAppMinutes = Object.values(state.apps).reduce((s, a) => s + Math.floor(a.timeRemainingSec / 60), 0);
+  const closeWarn = () => setWarn({ kind: null });
 
   const onAppOpen = (appId: string) => {
     const cfg = state.apps[appId];
     if (!cfg) return;
     if (cfg.timeRemainingSec <= 0) {
-      setWarnApp(appId);
+      setWarn({ kind: 'open-no-time', appId });
       return;
     }
     router.push({ pathname: '/app-locked', params: { appId } });
   };
 
-  const warnAppData = warnApp ? MOCK_APPS.find((a) => a.id === warnApp) : null;
-  const walletEmpty = state.timeWalletMinutes === 0;
+  const onTryAdd = (appId: string) => {
+    if (state.timeWalletMinutes <= 0) {
+      setWarn({ kind: 'plus-no-wallet', appId });
+      return false;
+    }
+    return true;
+  };
+
+  const warnApp = warn.appId ? MOCK_APPS.find((a) => a.id === warn.appId) : null;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
-      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 30 }}>
-        {/* Header */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-          <Pill label="Home" bg={colors.primary} fg="#fff" testID="home-pill" />
-          <Pill label={`${state.dailyChallengesCompleted} done today`} bg={colors.yellow} testID="daily-challenges-pill" />
+      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
+        {/* App-name header (replaces "HOME" pill) */}
+        <View style={s.appBar}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={s.brandDot}><Ionicons name="shield-checkmark" size={18} color={colors.primary} /></View>
+            <Text style={s.appName}>ThinkToUnlock</Text>
+          </View>
+          <Text style={s.greeting}>Stay focused.</Text>
         </View>
-        <Heading level={1} style={{ marginTop: 10 }}>STAY <Text style={{ color: colors.primary }}>FOCUSED.</Text></Heading>
 
         {/* Time Wallet hero */}
         <TouchableOpacity
           testID="time-wallet-card"
-          activeOpacity={0.9}
+          activeOpacity={0.92}
           onPress={() => router.push('/wallet-detail')}
-          style={{ marginTop: 18 }}
+          style={[s.walletCard, shadow.raised]}
         >
-          <BrutalCard bg={colors.primary}>
-            <Text style={s.walletLabel}>TIME WALLET</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
-              <Text style={s.walletNum} testID="wallet-minutes-text">{state.timeWalletMinutes}</Text>
-              <Text style={s.walletUnit}>min</Text>
-            </View>
-            <Text style={s.walletHint}>Tap to add time or view history →</Text>
-          </BrutalCard>
+          <View style={s.walletGlow} />
+          <Text style={s.walletLabel}>Time Wallet</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 6 }}>
+            <Text style={s.walletNum} testID="wallet-minutes-text">{state.timeWalletMinutes}</Text>
+            <Text style={s.walletUnit}>min</Text>
+          </View>
+          <View style={s.walletFooter}>
+            <Text style={s.walletHint}>Tap to add time or view history</Text>
+            <Ionicons name="arrow-forward" size={16} color="#fff" />
+          </View>
         </TouchableOpacity>
 
-        {/* Stats row */}
-        <View style={{ flexDirection: 'row', gap: 12, marginTop: 14 }}>
-          <BrutalCard style={{ flex: 1 }} bg={colors.yellow}>
-            <Text style={s.statLabel}>CHALLENGES</Text>
-            <Text style={s.statNum}>{state.dailyChallengesCompleted}</Text>
-          </BrutalCard>
-          <BrutalCard style={{ flex: 1 }} bg={colors.mint}>
-            <Text style={s.statLabel}>APP TIME</Text>
-            <Text style={s.statNum}>{totalAppMinutes}m</Text>
-          </BrutalCard>
-        </View>
+        {/* Earn-time CTA — moved here, between wallet and locked apps */}
+        <BrutalButton
+          title="Earn Time — Play Brain Game"
+          onPress={() => router.push('/(tabs)/games')}
+          full
+          style={{ marginTop: 16 }}
+          testID="earn-time-cta-btn"
+          icon={<Ionicons name="flash" size={18} color="#fff" />}
+        />
 
         {/* Locked Apps */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 22, marginBottom: 10 }}>
-          <Heading level={2}>LOCKED APPS</Heading>
-          <Text style={{ fontWeight: '900', color: colors.textMuted, fontSize: 12 }}>{lockedApps.length} APPS</Text>
+        <View style={s.sectionHeader}>
+          <Heading level={2}>Locked Apps</Heading>
+          <Text style={s.sectionMeta}>{lockedApps.length} apps</Text>
         </View>
 
         {lockedApps.length === 0 ? (
           <BrutalCard>
-            <Text style={{ fontWeight: '700', color: colors.black }}>No apps locked yet. Go to MANAGE tab to lock distracting apps.</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={s.emptyIcon}><Ionicons name="shield-outline" size={20} color={colors.textMuted} /></View>
+              <Text style={{ flex: 1, fontWeight: '500', color: colors.textMuted, fontSize: 14 }}>
+                No apps locked yet. Open the Manage tab to choose which apps to lock.
+              </Text>
+            </View>
           </BrutalCard>
         ) : (
           lockedApps.map((app) => (
-            <AppCard key={app.id} appId={app.id} appName={app.name} icon={app.icon} color={app.color} onOpen={() => onAppOpen(app.id)} />
+            <AppCard
+              key={app.id}
+              appId={app.id}
+              appName={app.name}
+              icon={app.icon}
+              color={app.color}
+              onOpen={() => onAppOpen(app.id)}
+              guardAdd={() => onTryAdd(app.id)}
+            />
           ))
         )}
-
-        <BrutalButton
-          title="Earn Time → Play Brain Game"
-          onPress={() => router.push('/(tabs)/games')}
-          bg={colors.black}
-          fg="#fff"
-          full
-          style={{ marginTop: 22 }}
-          testID="earn-time-cta-btn"
-          icon={<Ionicons name="flash" size={18} color="#fff" />}
-        />
       </ScrollView>
 
-      {/* Warning modal when opening app with no time */}
-      <Modal visible={!!warnApp} transparent animationType="fade" onRequestClose={() => setWarnApp(null)}>
-        <View style={s.modalBg}>
-          <BrutalCard bg={colors.background} style={{ width: '88%' }} testID="no-time-modal">
-            <Pill label="NO TIME" bg={colors.primary} fg="#fff" />
-            <Heading level={2} style={{ marginTop: 8 }}>{warnAppData?.name} is locked</Heading>
-            <Text style={s.modalText}>
-              {walletEmpty
-                ? 'Time wallet is empty. Play a brain game to earn time.'
-                : `You have ${state.timeWalletMinutes} min in your wallet. Add time to this app or play a game to earn more.`}
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-              <BrutalButton title="Play Game" onPress={() => { setWarnApp(null); router.push('/(tabs)/games'); }} bg={colors.mint} fg={colors.black} testID="warn-play-game-btn" style={{ flex: 1 }} />
-              <BrutalButton title="Close" onPress={() => setWarnApp(null)} bg={colors.surface} fg={colors.black} testID="warn-close-btn" style={{ flex: 1 }} />
-            </View>
-          </BrutalCard>
-        </View>
+      {/* Dismissable modal — handles both "open with no time" and "+ with no wallet" */}
+      <Modal visible={warn.kind !== null} transparent animationType="fade" onRequestClose={closeWarn}>
+        <TouchableWithoutFeedback onPress={closeWarn}>
+          <View style={s.modalBg}>
+            <TouchableWithoutFeedback>
+              <View style={[s.modalCard, shadow.raised]} testID="wallet-warn-modal">
+                <View style={s.modalIcon}>
+                  <Ionicons name="alert-circle" size={26} color={colors.primary} />
+                </View>
+                <Heading level={2} style={{ marginTop: 12 }}>
+                  {warn.kind === 'plus-no-wallet' ? 'Time wallet is empty' : `${warnApp?.name ?? 'App'} is locked`}
+                </Heading>
+                <Text style={s.modalText}>
+                  {warn.kind === 'plus-no-wallet'
+                    ? 'Your time wallet is at 0. Play a brain game to earn more time before adding it to apps.'
+                    : `You don't have any time on ${warnApp?.name ?? 'this app'}. Play a brain game to earn time, or add minutes from your wallet.`}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 18 }}>
+                  <BrutalButton title="Cancel" onPress={closeWarn} variant="soft" bg={colors.surfaceAlt} fg={colors.text} style={{ flex: 1 }} testID="warn-cancel-btn" />
+                  <BrutalButton title="Play Game" onPress={() => { closeWarn(); router.push('/(tabs)/games'); }} style={{ flex: 1 }} testID="warn-play-game-btn" />
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
       </Modal>
     </SafeAreaView>
   );
 }
 
-const AppCard: React.FC<{ appId: string; appName: string; icon: string; color: string; onOpen: () => void }> = ({ appId, appName, icon, color, onOpen }) => {
+const AppCard: React.FC<{
+  appId: string;
+  appName: string;
+  icon: string;
+  color: string;
+  onOpen: () => void;
+  guardAdd: () => boolean;
+}> = ({ appId, appName, icon, color, onOpen, guardAdd }) => {
   const { state, consumeWalletMinutesToApp, refundAppMinutesToWallet } = useAppState();
   const cfg = state.apps[appId];
   const mins = Math.floor(cfg.timeRemainingSec / 60);
   const secs = cfg.timeRemainingSec % 60;
 
   const add = async () => {
-    const ok = await consumeWalletMinutesToApp(appId, 5);
-    if (!ok) Alert.alert('Wallet empty', 'Earn more time by playing a brain game.');
+    if (!guardAdd()) return;
+    await consumeWalletMinutesToApp(appId, 5);
   };
   const sub = async () => {
-    if (cfg.timeRemainingSec < 60) {
-      Alert.alert('Nothing to refund', 'No time has been added to this app.');
-      return;
-    }
+    if (cfg.timeRemainingSec < 60) return;
     await refundAppMinutesToWallet(appId, 5);
   };
 
   return (
-    <View style={[s.appCard, shadow.default]} testID={`app-card-${appId}`}>
-      <TouchableOpacity activeOpacity={0.8} onPress={onOpen} style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }} testID={`app-open-${appId}`}>
-        <View style={[s.appIcon, { backgroundColor: color }]}>
-          <Text style={{ fontSize: 28 }}>{icon}</Text>
+    <View style={[s.appCard, shadow.card]} testID={`app-card-${appId}`}>
+      <TouchableOpacity activeOpacity={0.7} onPress={onOpen} style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }} testID={`app-open-${appId}`}>
+        <View style={[s.appIcon, { backgroundColor: color + '22' }]}>
+          <Text style={{ fontSize: 26 }}>{icon}</Text>
         </View>
-        <View style={{ flex: 1, marginLeft: 14 }}>
+        <View style={{ flex: 1, marginLeft: 12 }}>
           <Text style={s.appName}>{appName}</Text>
-          <Text style={s.appTime} testID={`app-time-${appId}`}>
-            {cfg.timeRemainingSec > 0 ? `${mins}m ${secs}s left` : 'No time'}
+          <Text style={[s.appTime, cfg.timeRemainingSec > 0 ? { color: colors.success } : null]} testID={`app-time-${appId}`}>
+            {cfg.timeRemainingSec > 0 ? `${mins}m ${secs}s remaining` : 'No time'}
           </Text>
         </View>
       </TouchableOpacity>
-      <View style={{ flexDirection: 'row', gap: 6 }}>
-        <BrutalIconButton label="−" onPress={sub} bg={colors.surface} testID={`app-minus-${appId}`} />
-        <BrutalIconButton label="+" onPress={add} bg={colors.yellow} testID={`app-plus-${appId}`} />
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <BrutalIconButton onPress={sub} bg={colors.surfaceAlt} testID={`app-minus-${appId}`} disabled={cfg.timeRemainingSec < 60}>
+          <Ionicons name="remove" size={20} color={cfg.timeRemainingSec < 60 ? colors.textLight : colors.text} />
+        </BrutalIconButton>
+        <BrutalIconButton onPress={add} bg={colors.primary} testID={`app-plus-${appId}`}>
+          <Ionicons name="add" size={20} color="#fff" />
+        </BrutalIconButton>
       </View>
     </View>
   );
 };
 
 const s = StyleSheet.create({
-  walletLabel: { color: '#fff', fontWeight: '900', letterSpacing: 2, fontSize: 12 },
-  walletNum: { color: '#fff', fontWeight: '900', fontSize: 84, letterSpacing: -4, lineHeight: 90 },
-  walletUnit: { color: '#fff', fontWeight: '900', fontSize: 22, marginLeft: 8 },
-  walletHint: { color: '#fff', fontWeight: '700', marginTop: 6, opacity: 0.9 },
-  statLabel: { fontSize: 11, fontWeight: '900', color: colors.black, letterSpacing: 1 },
-  statNum: { fontSize: 30, fontWeight: '900', color: colors.black, marginTop: 4, letterSpacing: -1 },
+  appBar: { marginBottom: 18 },
+  brandDot: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  appName: { fontSize: 18, fontWeight: '700', color: colors.text, letterSpacing: -0.3 },
+  greeting: { fontSize: 26, fontWeight: '700', color: colors.text, letterSpacing: -0.6, marginTop: 14 },
+
+  walletCard: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.xl,
+    padding: 22,
+    overflow: 'hidden',
+  },
+  walletGlow: {
+    position: 'absolute', top: -60, right: -40,
+    width: 200, height: 200, borderRadius: 100, backgroundColor: '#FF7A56', opacity: 0.6,
+  },
+  walletLabel: { color: 'rgba(255,255,255,0.85)', fontWeight: '500', fontSize: 13, letterSpacing: 0.3 },
+  walletNum: { color: '#fff', fontWeight: '700', fontSize: 64, letterSpacing: -2, lineHeight: 70 },
+  walletUnit: { color: '#fff', fontWeight: '500', fontSize: 18, marginLeft: 8, opacity: 0.85 },
+  walletFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
+  walletHint: { color: '#fff', fontWeight: '500', opacity: 0.9, fontSize: 13 },
+
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, marginBottom: 12 },
+  sectionMeta: { fontWeight: '500', color: colors.textMuted, fontSize: 13 },
+
+  emptyIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+
   appCard: {
     backgroundColor: colors.surface,
-    borderWidth: 4,
-    borderColor: colors.black,
+    borderRadius: radius.lg,
     padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  appIcon: {
-    width: 56, height: 56,
-    borderWidth: 3, borderColor: colors.black,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  appName: { fontWeight: '900', color: colors.black, fontSize: 16, letterSpacing: 0.5 },
-  appTime: { fontWeight: '700', color: colors.textMuted, fontSize: 13, marginTop: 2 },
-  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: 18 },
-  modalText: { fontWeight: '600', color: colors.black, marginTop: 10, fontSize: 15, lineHeight: 22 },
+  appIcon: { width: 50, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  appTime: { fontWeight: '500', color: colors.textMuted, fontSize: 13, marginTop: 2 },
+
+  modalBg: { flex: 1, backgroundColor: 'rgba(15,15,15,0.55)', alignItems: 'center', justifyContent: 'center', padding: 22 },
+  modalCard: { backgroundColor: colors.surface, borderRadius: radius.xl, padding: 22, width: '100%', maxWidth: 380 },
+  modalIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  modalText: { fontWeight: '500', color: colors.textMuted, marginTop: 8, fontSize: 14, lineHeight: 21 },
 });

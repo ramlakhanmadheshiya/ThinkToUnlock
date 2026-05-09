@@ -3,10 +3,10 @@ import { View, Text, StyleSheet, AppState as RNAppState, BackHandler } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { BrutalButton, BrutalCard, Heading, Pill } from '../src/components/Brutal';
+import { BrutalButton, BrutalCard, Heading } from '../src/components/Brutal';
 import { useAppState } from '../src/store/StateContext';
 import { MOCK_APPS } from '../src/data/mockApps';
-import { colors } from '../src/theme';
+import { colors, shadow, radius } from '../src/theme';
 
 export default function AppLockedScreen() {
   const router = useRouter();
@@ -19,7 +19,6 @@ export default function AppLockedScreen() {
   const [showWarning, setShowWarning] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Foreground-only countdown (decrement every second, persist every 5s)
   useEffect(() => {
     if (paused) return;
     timerRef.current = setInterval(() => {
@@ -38,15 +37,11 @@ export default function AppLockedScreen() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [paused, appId, warned30, decrementAppSeconds]);
 
-  // Pause on background; persist immediately
   useEffect(() => {
-    const sub = RNAppState.addEventListener('change', (s) => {
-      setPaused(s !== 'active');
-    });
+    const sub = RNAppState.addEventListener('change', (s) => setPaused(s !== 'active'));
     return () => sub.remove();
   }, []);
 
-  // Block hardware back to make user explicitly close
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => false);
     return () => sub.remove();
@@ -63,21 +58,18 @@ export default function AppLockedScreen() {
     );
   }
 
-  // Time over — locked overlay
   if (secLeft <= 0) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.primary }} edges={['top']}>
         <View style={s.overlayWrap}>
-          <View style={[s.bigIcon, { backgroundColor: colors.background }]}>
-            <Ionicons name="lock-closed" size={72} color={colors.black} />
+          <View style={s.bigIconLight}>
+            <Ionicons name="lock-closed" size={64} color="#fff" />
           </View>
-          <Heading level={1} style={{ color: '#fff', textAlign: 'center', marginTop: 18, fontSize: 44 }}>TIME OVER</Heading>
-          <Text style={s.overlayText} testID="time-over-text">
-            {app.name} is locked. Earn time or use Time Wallet to keep using.
-          </Text>
-          <View style={{ flexDirection: 'row', gap: 12, marginTop: 26, alignSelf: 'stretch' }}>
-            <BrutalButton title="Play Brain Game" onPress={() => router.replace('/(tabs)/games')} bg={colors.yellow} fg={colors.black} style={{ flex: 1 }} testID="locked-play-btn" />
-            <BrutalButton title="Home" onPress={() => router.replace('/(tabs)/home')} bg={colors.black} fg="#fff" style={{ flex: 1 }} testID="locked-home-btn" />
+          <Heading level={1} style={{ color: '#fff', textAlign: 'center', marginTop: 22, fontSize: 36 }}>Time's up</Heading>
+          <Text style={s.overlayText} testID="time-over-text">{app.name} is locked. Earn time by playing a brain game.</Text>
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: 28, alignSelf: 'stretch' }}>
+            <BrutalButton title="Play Brain Game" onPress={() => router.replace('/(tabs)/games')} bg="#fff" fg={colors.primary} style={{ flex: 1 }} testID="locked-play-btn" />
+            <BrutalButton title="Home" onPress={() => router.replace('/(tabs)/home')} variant="ghost" fg="#fff" style={{ flex: 1, borderColor: 'rgba(255,255,255,0.3)' }} testID="locked-home-btn" />
           </View>
         </View>
       </SafeAreaView>
@@ -86,61 +78,54 @@ export default function AppLockedScreen() {
 
   const m = Math.floor(secLeft / 60);
   const sc = secLeft % 60;
+  const danger = secLeft <= 30;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
       <View style={{ padding: 18 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <Pill label="USING APP" bg={colors.mint} />
-          {paused && <Pill label="PAUSED" bg={colors.disabled} />}
+        <View style={s.statusRow}>
+          <View style={[s.statusDot, paused && { backgroundColor: colors.warn }]} />
+          <Text style={s.statusText}>{paused ? 'Paused — return to resume' : 'Active session'}</Text>
         </View>
 
-        <BrutalCard style={{ marginTop: 16, alignItems: 'center' }} bg={colors.surface}>
-          <View style={[s.bigIcon, { backgroundColor: app.color, marginTop: 8 }]}>
-            <Text style={{ fontSize: 64 }}>{app.icon}</Text>
+        <View style={[s.appHero, shadow.card]}>
+          <View style={[s.appIcon, { backgroundColor: app.color + '22' }]}>
+            <Text style={{ fontSize: 56 }}>{app.icon}</Text>
           </View>
           <Heading level={1} style={{ marginTop: 14 }}>{app.name}</Heading>
-          <Text style={{ fontWeight: '700', color: colors.textMuted, marginTop: 4 }}>simulated foreground</Text>
-        </BrutalCard>
+          <Text style={{ fontWeight: '500', color: colors.textMuted, marginTop: 4, fontSize: 13 }}>simulated foreground session</Text>
+        </View>
 
-        <BrutalCard bg={colors.black} style={{ marginTop: 18, alignItems: 'center' }}>
-          <Text style={{ color: '#fff', fontWeight: '900', letterSpacing: 2, fontSize: 12 }}>TIME REMAINING</Text>
-          <Text testID="countdown-text" style={{ color: secLeft <= 30 ? colors.primary : colors.yellow, fontWeight: '900', fontSize: 88, letterSpacing: -3, marginTop: 4 }}>
+        <BrutalCard style={[{ marginTop: 16, alignItems: 'center', backgroundColor: danger ? colors.error : colors.text }]}>
+          <Text style={{ color: 'rgba(255,255,255,0.7)', fontWeight: '600', fontSize: 12, letterSpacing: 1 }}>TIME REMAINING</Text>
+          <Text testID="countdown-text" style={{ color: '#fff', fontWeight: '700', fontSize: 70, letterSpacing: -2, marginTop: 6 }}>
             {String(m).padStart(2, '0')}:{String(sc).padStart(2, '0')}
           </Text>
-          <Text style={{ color: '#fff', fontWeight: '700', marginTop: 4 }}>countdown only when on screen</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.7)', fontWeight: '500', marginTop: 4, fontSize: 12 }}>countdown only on screen</Text>
         </BrutalCard>
 
         {showWarning && (
-          <BrutalCard bg={colors.primary} style={{ marginTop: 14 }} testID="warning-banner-30">
+          <BrutalCard style={[{ marginTop: 14, backgroundColor: colors.warnSoft }]} testID="warning-banner-30">
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Ionicons name="alert-circle" size={26} color="#fff" />
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14, flex: 1 }}>30 SECONDS LEFT — APP WILL LOCK SOON</Text>
+              <Ionicons name="alert-circle" size={22} color={colors.warn} />
+              <Text style={{ color: colors.text, fontWeight: '600', fontSize: 13, flex: 1 }}>30 seconds left — app will lock soon</Text>
             </View>
           </BrutalCard>
         )}
 
-        <BrutalButton
-          title="Close App (Stop Timer)"
-          onPress={() => router.replace('/(tabs)/home')}
-          bg={colors.surface}
-          fg={colors.black}
-          full
-          style={{ marginTop: 18 }}
-          testID="close-app-btn"
-        />
+        <BrutalButton title="Close & stop timer" onPress={() => router.replace('/(tabs)/home')} variant="soft" bg={colors.surfaceAlt} fg={colors.text} full style={{ marginTop: 18 }} testID="close-app-btn" />
       </View>
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success },
+  statusText: { fontWeight: '600', fontSize: 12, color: colors.textMuted, letterSpacing: 0.3 },
+  appHero: { backgroundColor: colors.surface, borderRadius: radius.xl, padding: 22, alignItems: 'center', marginTop: 14 },
+  appIcon: { width: 100, height: 100, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   overlayWrap: { flex: 1, padding: 24, alignItems: 'center', justifyContent: 'center' },
-  overlayText: { color: '#fff', fontWeight: '700', fontSize: 16, textAlign: 'center', marginTop: 14, lineHeight: 22 },
-  bigIcon: {
-    width: 140, height: 140,
-    borderWidth: 4, borderColor: colors.black,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOffset: { width: 6, height: 6 }, shadowOpacity: 1, shadowRadius: 0, elevation: 8,
-  },
+  overlayText: { color: '#fff', fontWeight: '500', fontSize: 15, textAlign: 'center', marginTop: 12, lineHeight: 22, opacity: 0.9 },
+  bigIconLight: { width: 120, height: 120, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
 });

@@ -1,18 +1,25 @@
 import React from 'react';
-import { Text, View, TouchableOpacity, StyleSheet, ViewStyle, TextStyle, TextInput, TextInputProps, StyleProp } from 'react-native';
-import { colors, shadow } from '../theme';
+import { Text, View, TouchableOpacity, StyleSheet, ViewStyle, TextStyle, TextInput, TextInputProps, StyleProp, ActivityIndicator } from 'react-native';
+import { colors, shadow, radius } from '../theme';
 
+// -----------------------------
+// Card
+// -----------------------------
 export const BrutalCard: React.FC<{
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   bg?: string;
   testID?: string;
-}> = ({ children, style, bg = colors.surface, testID }) => (
-  <View testID={testID} style={[styles.card, { backgroundColor: bg }, shadow.default, style]}>
+  flat?: boolean;
+}> = ({ children, style, bg = colors.surface, testID, flat }) => (
+  <View testID={testID} style={[styles.card, { backgroundColor: bg }, flat ? null : shadow.card, style]}>
     {children}
   </View>
 );
 
+// -----------------------------
+// Button (primary / secondary / ghost)
+// -----------------------------
 export const BrutalButton: React.FC<{
   title: string;
   onPress: () => void;
@@ -21,70 +28,96 @@ export const BrutalButton: React.FC<{
   small?: boolean;
   full?: boolean;
   disabled?: boolean;
+  loading?: boolean;
   style?: StyleProp<ViewStyle>;
   testID?: string;
   icon?: React.ReactNode;
-}> = ({ title, onPress, bg = colors.primary, fg = '#fff', small, full, disabled, style, testID, icon }) => (
-  <TouchableOpacity
-    testID={testID}
-    activeOpacity={0.85}
-    disabled={disabled}
-    onPress={onPress}
-    style={[
-      styles.btn,
-      shadow.sm,
-      {
-        backgroundColor: disabled ? colors.disabled : bg,
-        paddingVertical: small ? 10 : 16,
-        paddingHorizontal: small ? 14 : 22,
-        alignSelf: full ? 'stretch' : 'flex-start',
-      },
-      style,
-    ]}
-  >
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-      {icon}
-      <Text style={[styles.btnText, { color: fg, fontSize: small ? 13 : 16 }]} numberOfLines={1}>
-        {title}
-      </Text>
-    </View>
-  </TouchableOpacity>
-);
+  variant?: 'solid' | 'soft' | 'ghost';
+}> = ({ title, onPress, bg, fg, small, full, disabled, loading, style, testID, icon, variant = 'solid' }) => {
+  let backgroundColor = bg ?? colors.primary;
+  let color = fg ?? '#fff';
+  if (variant === 'soft' && !bg) { backgroundColor = colors.primarySoft; color = colors.primary; }
+  if (variant === 'ghost') { backgroundColor = 'transparent'; color = fg ?? colors.text; }
 
+  return (
+    <TouchableOpacity
+      testID={testID}
+      activeOpacity={0.85}
+      disabled={disabled || loading}
+      onPress={onPress}
+      style={[
+        styles.btn,
+        variant === 'solid' ? shadow.soft : null,
+        {
+          backgroundColor: disabled ? colors.surfaceAlt : backgroundColor,
+          paddingVertical: small ? 10 : 14,
+          paddingHorizontal: small ? 14 : 22,
+          alignSelf: full ? 'stretch' : 'flex-start',
+          borderWidth: variant === 'ghost' ? 1 : 0,
+          borderColor: colors.border,
+        },
+        style,
+      ]}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        {loading ? <ActivityIndicator size="small" color={color} /> : icon}
+        <Text style={[styles.btnText, { color: disabled ? colors.textLight : color, fontSize: small ? 13 : 15 }]} numberOfLines={1}>
+          {title}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+// -----------------------------
+// Round Icon Button (e.g. + - close)
+// -----------------------------
 export const BrutalIconButton: React.FC<{
-  label: string;
+  label?: string;
   onPress: () => void;
   bg?: string;
   fg?: string;
   testID?: string;
   disabled?: boolean;
-}> = ({ label, onPress, bg = colors.yellow, fg = colors.black, testID, disabled }) => (
+  size?: number;
+  children?: React.ReactNode;
+}> = ({ label, onPress, bg = colors.surfaceAlt, fg = colors.text, testID, disabled, size = 38, children }) => (
   <TouchableOpacity
     testID={testID}
-    activeOpacity={0.85}
+    activeOpacity={0.7}
     onPress={onPress}
     disabled={disabled}
-    style={[styles.iconBtn, shadow.sm, { backgroundColor: disabled ? colors.disabled : bg }]}
+    style={[
+      styles.iconBtn,
+      { backgroundColor: disabled ? colors.surfaceAlt : bg, width: size, height: size, borderRadius: size / 2 },
+    ]}
   >
-    <Text style={{ color: fg, fontSize: 22, fontWeight: '900' }}>{label}</Text>
+    {children || <Text style={{ color: disabled ? colors.textLight : fg, fontSize: size * 0.5, fontWeight: '600', lineHeight: size * 0.5 + 2 }}>{label}</Text>}
   </TouchableOpacity>
 );
 
-export const BrutalInput: React.FC<TextInputProps & { testID?: string }> = (props) => (
+// -----------------------------
+// Input
+// -----------------------------
+export const BrutalInput: React.FC<TextInputProps & { testID?: string; error?: boolean }> = ({ error, style, ...props }) => (
   <TextInput
     {...props}
-    placeholderTextColor="#777"
-    style={[styles.input, shadow.sm, props.style]}
+    placeholderTextColor={colors.textLight}
+    style={[styles.input, error ? { borderColor: colors.error } : null, style]}
   />
 );
 
-export const Heading: React.FC<{ children: React.ReactNode; style?: StyleProp<TextStyle>; level?: 1 | 2 | 3 }> = ({ children, style, level = 1 }) => (
+// -----------------------------
+// Heading
+// -----------------------------
+export const Heading: React.FC<{ children: React.ReactNode; style?: StyleProp<TextStyle>; level?: 1 | 2 | 3 | 4 }> = ({ children, style, level = 1 }) => (
   <Text
     style={[
       styles.heading,
-      level === 1 && { fontSize: 36 },
-      level === 2 && { fontSize: 24 },
-      level === 3 && { fontSize: 18 },
+      level === 1 && { fontSize: 28, fontWeight: '700', letterSpacing: -0.6 },
+      level === 2 && { fontSize: 20, fontWeight: '700', letterSpacing: -0.3 },
+      level === 3 && { fontSize: 16, fontWeight: '600' },
+      level === 4 && { fontSize: 13, fontWeight: '600', letterSpacing: 0.5, color: colors.textMuted },
       style,
     ]}
   >
@@ -92,60 +125,61 @@ export const Heading: React.FC<{ children: React.ReactNode; style?: StyleProp<Te
   </Text>
 );
 
-export const Pill: React.FC<{ label: string; bg?: string; fg?: string; style?: StyleProp<ViewStyle>; testID?: string }> = ({ label, bg = colors.yellow, fg = colors.black, style, testID }) => (
-  <View testID={testID} style={[styles.pill, { backgroundColor: bg }, style]}>
-    <Text style={{ color: fg, fontWeight: '900', fontSize: 12, letterSpacing: 1 }}>{label.toUpperCase()}</Text>
+// -----------------------------
+// Chip / Pill
+// -----------------------------
+export const Pill: React.FC<{ label: string; bg?: string; fg?: string; style?: StyleProp<ViewStyle>; testID?: string; icon?: React.ReactNode }> = ({ label, bg = colors.surfaceAlt, fg = colors.text, style, testID, icon }) => (
+  <View testID={testID} style={[styles.pill, { backgroundColor: bg, flexDirection: 'row', alignItems: 'center' }, style]}>
+    {icon ? <View style={{ marginRight: 6 }}>{icon}</View> : null}
+    <Text style={{ color: fg, fontWeight: '600', fontSize: 12, letterSpacing: 0.2 }}>{label}</Text>
   </View>
+);
+
+// -----------------------------
+// Section divider title
+// -----------------------------
+export const SectionLabel: React.FC<{ children: React.ReactNode; style?: StyleProp<TextStyle> }> = ({ children, style }) => (
+  <Text style={[{ fontSize: 11, fontWeight: '700', color: colors.textMuted, letterSpacing: 1, textTransform: 'uppercase' }, style]}>
+    {children}
+  </Text>
 );
 
 const styles = StyleSheet.create({
   card: {
-    borderWidth: 4,
-    borderColor: colors.black,
-    borderRadius: 0,
+    borderRadius: radius.lg,
     padding: 18,
   },
   btn: {
-    borderWidth: 4,
-    borderColor: colors.black,
-    borderRadius: 0,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   btnText: {
-    fontWeight: '900',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   iconBtn: {
-    borderWidth: 4,
-    borderColor: colors.black,
-    width: 44,
-    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
   input: {
-    borderWidth: 4,
-    borderColor: colors.black,
-    backgroundColor: '#fff',
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceAlt,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.black,
+    fontSize: 15,
+    fontWeight: '500',
+    color: colors.text,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
   },
   heading: {
-    color: colors.black,
-    fontWeight: '900',
-    letterSpacing: -1,
-    textTransform: 'uppercase',
+    color: colors.text,
   },
   pill: {
-    borderWidth: 3,
-    borderColor: colors.black,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
     alignSelf: 'flex-start',
   },
 });

@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BrutalButton, BrutalCard, BrutalInput, Heading, Pill } from '../src/components/Brutal';
+import { Ionicons } from '@expo/vector-icons';
+import { BrutalButton, BrutalCard, BrutalInput, Heading } from '../src/components/Brutal';
 import { useAppState } from '../src/store/StateContext';
 import { colors } from '../src/theme';
 
@@ -23,13 +24,15 @@ export default function SetupPassword() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={{ padding: 22, paddingTop: 36 }} keyboardShouldPersistTaps="handled">
-          <Pill label="Welcome" bg={colors.primary} fg="#fff" testID="welcome-pill" />
-          <Heading level={1} style={{ marginTop: 12 }}>THINK<Text style={{ color: colors.primary }}>2</Text>UNLOCK</Heading>
-          <Text style={styles.sub}>Set a parent password. Required to manage which apps stay locked.</Text>
+        <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 36 }} keyboardShouldPersistTaps="handled">
+          <View style={s.logoBox}>
+            <Ionicons name="shield-checkmark" size={32} color={colors.primary} />
+          </View>
+          <Heading level={1} style={{ marginTop: 18 }}>ThinkToUnlock</Heading>
+          <Text style={s.sub}>Set a parent password. It controls which apps stay locked and gates the manage section.</Text>
 
-          <BrutalCard style={{ marginTop: 18 }}>
-            <Text style={styles.label}>NEW PARENT PASSWORD</Text>
+          <BrutalCard style={{ marginTop: 22 }}>
+            <Text style={s.label}>New parent password</Text>
             <BrutalInput
               testID="setup-password-input"
               value={pw}
@@ -38,29 +41,30 @@ export default function SetupPassword() {
               secureTextEntry
               autoCapitalize="none"
             />
-            <Text style={[styles.label, { marginTop: 14 }]}>CONFIRM PASSWORD</Text>
+            <Text style={[s.label, { marginTop: 14 }]}>Confirm password</Text>
             <BrutalInput
               testID="setup-password-confirm-input"
               value={pw2}
               onChangeText={(t) => { setPw2(t); setErr(''); }}
-              placeholder="Repeat"
+              placeholder="Repeat password"
               secureTextEntry
               autoCapitalize="none"
             />
-            {err ? <Text style={styles.err} testID="setup-password-error">{err}</Text> : null}
+            {err ? <Text style={s.err} testID="setup-password-error">{err}</Text> : null}
             <BrutalButton title="Set & Continue" onPress={submit} full style={{ marginTop: 18 }} testID="setup-password-submit-btn" />
           </BrutalCard>
 
-          <Text style={styles.note}>You can change it later in Settings.</Text>
+          <Text style={s.note}>You can change it later in Settings.</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  sub: { color: colors.black, fontWeight: '600', marginTop: 14, fontSize: 15, lineHeight: 22 },
-  label: { color: colors.black, fontWeight: '900', fontSize: 12, letterSpacing: 1, marginBottom: 6 },
-  err: { color: colors.primary, fontWeight: '900', marginTop: 10 },
-  note: { color: colors.textMuted, fontWeight: '600', marginTop: 16, textAlign: 'center' },
+const s = StyleSheet.create({
+  logoBox: { width: 64, height: 64, borderRadius: 18, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  sub: { color: colors.textMuted, fontWeight: '500', marginTop: 10, fontSize: 15, lineHeight: 22 },
+  label: { color: colors.text, fontWeight: '600', fontSize: 13, marginBottom: 8 },
+  err: { color: colors.error, fontWeight: '600', marginTop: 10, fontSize: 13 },
+  note: { color: colors.textLight, fontWeight: '500', marginTop: 22, textAlign: 'center', fontSize: 13 },
 });

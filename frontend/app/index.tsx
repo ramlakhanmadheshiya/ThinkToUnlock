@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAppState } from '../src/store/StateContext';
 import { colors } from '../src/theme';
 
@@ -10,17 +11,21 @@ export default function Index() {
 
   useEffect(() => {
     if (!ready) return;
-    if (!state.parentPassword) {
-      router.replace('/setup-password');
-    } else {
-      router.replace('/(tabs)/home');
-    }
+    if (!state.parentPassword) router.replace('/setup-password');
+    else router.replace('/(tabs)/home');
   }, [ready, state.parentPassword, router]);
 
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
-      <Text style={{ fontWeight: '900', fontSize: 32, color: colors.black, letterSpacing: -1 }}>THINK<Text style={{ color: colors.primary }}>2</Text>UNLOCK</Text>
-      <ActivityIndicator color={colors.black} style={{ marginTop: 24 }} />
+    <View style={s.wrap}>
+      <View style={s.logoBox}><Ionicons name="shield-checkmark" size={32} color={colors.primary} /></View>
+      <Text style={s.title}>ThinkToUnlock</Text>
+      <ActivityIndicator color={colors.primary} style={{ marginTop: 24 }} />
     </View>
   );
 }
+
+const s = StyleSheet.create({
+  wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
+  logoBox: { width: 64, height: 64, borderRadius: 18, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 24, fontWeight: '700', color: colors.text, marginTop: 16, letterSpacing: -0.5 },
+});
