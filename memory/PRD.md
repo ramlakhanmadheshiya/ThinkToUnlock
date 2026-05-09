@@ -1,80 +1,89 @@
-# ThinkToUnlock — PRD
+# ThinkToUnlock — PRD (v1.1)
 
 ## Overview
 Android-first mobile app to stop doom-scrolling. Locks distracting apps until the user earns time by completing brain-game challenges.
 
 ## Architecture
 - **Frontend**: Expo Router (file-based) + React Native + TypeScript
-- **Backend**: Untouched (FastAPI scaffold remains)
-- **Storage**: AsyncStorage (local-only, single device, no auth)
-- **Native locking**: Simulated within the app (real Android UsageStatsManager + AccessibilityService requires custom dev build — left as a future hook)
+- **Storage**: AsyncStorage (local-only, single device)
+- **Native locking**: Simulated within the app — real locking requires custom dev build (deferred)
 
-## Theme
-Neo-brutalist: off-white `#F5F1E8` background, terracotta `#E04D36` accent, black `#0A0A0A` text, thick 4px black borders, hard offset shadows (4-6px solid black drop). Headings ALL CAPS, font-weight 900, tight letter spacing.
+## Theme (v1.1 — Modern, replaces neo-brutalist)
+- Background `#FAFAF9`, surface `#FFFFFF`, alt `#F4F4F5`
+- Primary terracotta orange `#FF5A36`, soft tint `#FFEDE6`
+- Text `#18181B`, muted `#71717A`, light `#A1A1AA`
+- Soft drop shadows (elevation 1-5), rounded corners 14-22px
+- No yellow, no thick borders, no hard offset shadows
+- Premium accent purple `#8B5CF6`
+- Semantic green `#10B981` / red `#EF4444` for game feedback
 
-## Features Implemented (MVP)
-### Onboarding
-- Force parent password setup on first launch (min 4 chars).
+## Tabs
 
-### Tab: Home
-- Time Wallet hero card (tap → wallet detail).
-- Daily challenges counter pill.
-- Locked apps list with `+` (consume 5 wallet min → app) and `−` (refund 5 min) buttons.
-- Tap on app → if it has time, opens simulated app screen with foreground-only countdown.
-- Tap on app with no time → modal: "Play Game" or "Close".
-- 30-sec pre-lock warning banner when countdown reaches 30s.
-- Earn-time CTA → Games tab.
+### Home
+- App-name header "ThinkToUnlock" (no tab-name pill)
+- Time Wallet hero card (orange, glow effect) — tap → wallet detail (history)
+- "Earn Time → Play Brain Game" CTA — placed between wallet and locked apps
+- Locked apps cards with `+` (consume 5 wallet min) / `−` (refund 5 min)
+- Tap on app → simulated countdown screen if has time, else dismissable modal
+- **Dismissable modal** appears for: app with no time, OR `+` tap with empty wallet (Cancel button + outside-tap dismiss)
 
-### Tab: Games
-- 5 fully implemented brain games: Memory Match, Math Quiz, Word Scramble, Pattern Recall, Number Sequence.
-- 15 placeholder "Coming Soon" cards.
-- Random Challenge button.
-- Per-game flow: Start screen (logo, "prove you're focused. Score ≥ 60% to pass and unlock your app", difficulty pills with reward, Start button) → Play → Win/Loss screen with score card, quote, Play Again / Try Again, Back to Home.
-- Difficulty rewards: Easy +5, Medium +10, Hard +15 minutes.
+### Games
+- "Brain Challenges" heading (no tab-name pill)
+- Random Challenge button
+- Grid of 20 game cards: 5 implemented + 15 placeholders ("SOON")
+- 5 implemented games:
+  - **Memory Match** — flip pairs. Easy 4 pairs/60s/target ≤6 moves; Med 6/90s/≤10; Hard 8/120s/≤14. Score = completion × (0.5 + 0.5 × efficiency).
+  - **Math Quiz** — 8 questions w/ per-question timer (25/18/12s), +,-,×, range 15/30/60. Red/green feedback. Score = correct/total × 100.
+  - **Word Scramble** — 5 rounds w/ per-round timer (25/20/15s). 3-4 / 5-6 / 7-9 letter words. Score = correct/5 × 100.
+  - **Pattern Recall** — 4 rounds, sequence length 3/5/7. Score = correctRounds/4 × 100.
+  - **Number Sequence** — 6 questions w/ per-question timer (20/15/10s), patterns: add / +mul / +sq +fib. Red/green feedback.
+- Each game: Start screen (logo, "prove you're focused. Score ≥60%", difficulty tiles, reward card, Start button) → Play → Win/Loss screen (score card, quote, Play Again / Back to Home).
 
-### Tab: Manage Apps
-- Parent-password gated.
-- Toggle lock/unlock for 12 mock apps (Instagram, TikTok, YouTube, PUBG, Snapchat, Facebook, WhatsApp, Twitter/X, Reddit, Discord, Telegram, Netflix).
-- Premium banner / clock icon (when premium) to set daily auto top-up minutes per app.
+### Manage Apps (parent-gated, auto-locks on blur)
+- 12 mock apps with toggle lock/unlock switches
+- Lock icon top-right corner (no text button)
+- Premium banner if not premium → routes to /premium
+- When premium: clock icon per locked app to set daily auto top-up
 
-### Tab: Settings
-- Change parent password (requires current password).
-- Min daily challenges (premium only).
-- Reset app (password-confirmed wipe + return to setup).
-- Premium upgrade card.
+### Settings (parent-gated, auto-locks on blur)
+- Lock icon top-right corner
+- Account section: Change parent password
+- **Premium Features section** (star icon header):
+  - Daily auto top-up
+  - Min challenges per day (locked behind premium)
+  - Full play history
+  - All rows show lock icon when not premium → routes to /premium
+- Danger zone: Reset app (password-confirmed wipe)
 
 ### Premium (Mock Paywall)
-- "Pass Payment" → unlocks all premium features.
-- "Fail Payment" → no unlock.
-- Premium features: Daily auto top-up at midnight per app, min daily challenge gate.
+- Premium features list with checkmarks
+- Price card $4.99 lifetime
+- Pass Payment / Fail Payment buttons (Google Billing not yet wired)
+- Pass → unlocks all premium features
 
-### Wallet Detail
-- Add Time button → Games tab.
-- History list: game name, difficulty, ± minutes, time-of-day (today) or date (older).
-
-## Mocked / Simulated
-- **MOCKED INSTALLED-APPS LIST**: 12 hardcoded mock apps (real Android `PackageManager` requires native module).
-- **SIMULATED APP LOCKING**: Foreground countdown happens within the ThinkToUnlock app — we cannot actually lock other Android apps in Expo Go preview.
-- **MOCKED PREMIUM PAYMENT**: Pass/Fail buttons (Google Billing not yet wired).
-- **MOCKED 30-SEC NOTIFICATION**: In-app banner (not a real OS notification).
-
-## Data Schema (AsyncStorage key `thinktounlock:v1`)
+## Data (AsyncStorage `thinktounlock:v1`)
 ```
 {
-  parentPassword: string,
-  timeWalletMinutes: number,
-  dailyChallengesCompleted: number,
-  lastChallengeResetDate: 'YYYY-MM-DD',
+  parentPassword, timeWalletMinutes, dailyChallengesCompleted, lastChallengeResetDate,
   apps: { [id]: { locked, timeRemainingSec, defaultDailyMinutes } },
   history: [{ id, gameId, gameName, difficulty, minutesAdded, passed, timestamp }],
-  isPremium: boolean,
-  minDailyChallenges: number,
-  lastDailyTopupDate: string
+  isPremium, minDailyChallenges, lastDailyTopupDate
 }
 ```
 
-## Future Native Wiring (Out of MVP scope)
-1. `expo-modules-core` custom native module to read `PackageManager` apps.
-2. `AccessibilityService` to detect app foreground & redirect to ThinkToUnlock when time runs out.
-3. `expo-notifications` for real OS-level 30-sec pre-lock alert.
-4. Google Play Billing for real premium purchase.
+## Mocked / Deferred
+- **MOCKED installed-apps list** (12 apps; real PackageManager needs native module)
+- **MOCKED app locking** (in-app simulation; real locking needs AccessibilityService + custom dev build)
+- **MOCKED 30-sec pre-lock notification** (in-app banner; OS notification needs expo-notifications + dev build)
+- **MOCKED premium payment** (Pass/Fail buttons; Google Billing not yet integrated)
+
+## Critical Fixes (v1.1)
+- Preload Ionicons font via `useFonts(Ionicons.font)` + SplashScreen lock — fixes Expo Go iOS crash
+- Auto-lock Manage & Settings on tab blur via `useFocusEffect` cleanup
+- Game scoring re-tuned (Memory Match efficiency formula, per-game timers)
+
+## Future Native Wiring (Custom dev build / EAS Build required)
+1. `expo-modules-core` custom native module → `PackageManager.getInstalledApplications()`
+2. `AccessibilityService` to detect app foreground & redirect to ThinkToUnlock when timer hits 0
+3. `expo-notifications` for real OS-level 30-sec pre-lock alert
+4. Google Play Billing for real premium purchase (test via Play Console)
