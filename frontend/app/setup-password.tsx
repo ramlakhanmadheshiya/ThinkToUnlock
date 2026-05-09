@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '../src/components/Icon';
 import { BrutalButton, BrutalCard, BrutalInput, Heading } from '../src/components/Brutal';
 import { useAppState } from '../src/store/StateContext';
 import { colors } from '../src/theme';

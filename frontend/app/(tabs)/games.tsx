@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '../../src/components/Icon';
 import { BrutalButton, Heading } from '../../src/components/Brutal';
 import { GAMES } from '../../src/data/games';
 import { colors, shadow, radius } from '../../src/theme';

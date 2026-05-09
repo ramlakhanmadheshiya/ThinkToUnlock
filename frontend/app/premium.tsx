@@ -2,10 +2,18 @@ import React from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '../src/components/Icon';
 import { BrutalButton, BrutalCard, Heading } from '../src/components/Brutal';
 import { useAppState } from '../src/store/StateContext';
 import { colors, shadow, radius } from '../src/theme';
+
+const FEATURES = [
+  { icon: 'time-outline', title: 'Daily Time Top-Up', desc: 'Auto-deposits time into specific apps every day at a chosen hour. Treated as a separate allowance — wallet time depletes first.' },
+  { icon: 'trophy-outline', title: 'Minimum Daily Quota', desc: 'Force N challenges before any locked app can open. With per-app exclude list (e.g. WhatsApp, Phone).' },
+  { icon: 'school-outline', title: 'Strict Focus Mode', desc: 'Define no-unlock hours for chosen apps. Time earned during these hours stays in the wallet for later.' },
+  { icon: 'speedometer-outline', title: 'Custom Pass Rates', desc: 'Raise required passing score for games from 60% up to 95%.' },
+  { icon: 'calendar-outline', title: 'Weekly Time Top-Up', desc: 'Bonus time on Sat/Sun, auto-resets Monday at 12 AM.' },
+];
 
 export default function PremiumScreen() {
   const router = useRouter();
@@ -17,24 +25,31 @@ export default function PremiumScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
       <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
-        <BackBtn onPress={() => router.back()} />
+        <TouchableOpacity onPress={() => router.back()} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} testID="premium-back-btn" activeOpacity={0.7}>
+          <Ionicons name="arrow-back" size={20} color={colors.text} />
+          <Text style={{ fontWeight: '600', color: colors.text, fontSize: 14 }}>Back</Text>
+        </TouchableOpacity>
 
         <View style={{ alignItems: 'center', marginTop: 14 }}>
           <View style={s.starIcon}><Ionicons name="star" size={32} color={colors.premium} /></View>
           <Heading level={1} style={{ marginTop: 16, textAlign: 'center' }}>{state.isPremium ? "You're Premium" : 'Go Premium'}</Heading>
-          <Text style={s.sub}>{state.isPremium ? 'All features unlocked. Thanks for supporting focus.' : 'Unlock automation that keeps you on track without lifting a finger.'}</Text>
+          <Text style={s.sub}>{state.isPremium ? 'All five features unlocked. Manage them from Settings.' : 'Unlock five powerful tools that keep distractions in check on autopilot.'}</Text>
         </View>
 
         <Text style={s.section}>Premium features</Text>
-
         <BrutalCard style={{ marginTop: 8 }}>
-          <Feature icon="time-outline" title="Daily auto top-up" desc="30 min Instagram, 10 min PUBG — auto-added every midnight." />
-          <Divider />
-          <Feature icon="trophy-outline" title="Min daily challenges" desc="Phone won't unlock until N brain games are passed." />
-          <Divider />
-          <Feature icon="bar-chart-outline" title="Full play history" desc="Unlimited history with insights and streaks." />
-          <Divider />
-          <Feature icon="notifications-outline" title="Smart reminders" desc="Pre-lock notifications and weekly recaps." />
+          {FEATURES.map((f, i) => (
+            <React.Fragment key={f.title}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 6 }}>
+                <View style={s.featureIcon}><Ionicons name={f.icon} size={18} color={colors.premium} /></View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={{ fontWeight: '600', color: colors.text, fontSize: 14 }}>{f.title}</Text>
+                  <Text style={{ fontWeight: '500', color: colors.textMuted, fontSize: 13, marginTop: 2, lineHeight: 19 }}>{f.desc}</Text>
+                </View>
+              </View>
+              {i < FEATURES.length - 1 && <View style={{ height: 1, backgroundColor: colors.divider, marginVertical: 8 }} />}
+            </React.Fragment>
+          ))}
         </BrutalCard>
 
         {!state.isPremium ? (
@@ -46,27 +61,10 @@ export default function PremiumScreen() {
             </View>
 
             <Text style={s.testNote}>Test mode — Google Billing not yet wired</Text>
-
-            <BrutalButton
-              title="Pass Payment (Unlock)"
-              onPress={passPayment}
-              full
-              style={{ marginTop: 8 }}
-              bg={colors.success}
-              testID="premium-pass-btn"
-              icon={<Ionicons name="checkmark-circle" size={18} color="#fff" />}
-            />
-            <BrutalButton
-              title="Fail Payment"
-              onPress={failPayment}
-              full
-              style={{ marginTop: 10 }}
-              variant="soft"
-              bg={colors.surfaceAlt}
-              fg={colors.text}
-              testID="premium-fail-btn"
-              icon={<Ionicons name="close-circle-outline" size={18} color={colors.text} />}
-            />
+            <BrutalButton title="Pass Payment (Unlock)" onPress={passPayment} full style={{ marginTop: 8 }} bg={colors.success} testID="premium-pass-btn"
+              icon={<Ionicons name="checkmark-circle" size={18} color="#fff" />} />
+            <BrutalButton title="Fail Payment" onPress={failPayment} full style={{ marginTop: 10 }} variant="soft" bg={colors.surfaceAlt} fg={colors.text} testID="premium-fail-btn"
+              icon={<Ionicons name="close-circle-outline" size={18} color={colors.text} />} />
           </>
         ) : (
           <BrutalButton title="Cancel Premium (test)" onPress={async () => { await setPremium(false); }} variant="soft" bg={colors.surfaceAlt} fg={colors.text} full style={{ marginTop: 18 }} testID="premium-cancel-btn" />
@@ -75,25 +73,6 @@ export default function PremiumScreen() {
     </SafeAreaView>
   );
 }
-
-const Feature: React.FC<{ icon: keyof typeof Ionicons.glyphMap; title: string; desc: string }> = ({ icon, title, desc }) => (
-  <View style={{ flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 4 }}>
-    <View style={s.featureIcon}><Ionicons name={icon} size={18} color={colors.premium} /></View>
-    <View style={{ flex: 1, marginLeft: 12 }}>
-      <Text style={{ fontWeight: '600', color: colors.text, fontSize: 14 }}>{title}</Text>
-      <Text style={{ fontWeight: '500', color: colors.textMuted, fontSize: 13, marginTop: 2, lineHeight: 19 }}>{desc}</Text>
-    </View>
-  </View>
-);
-
-const Divider = () => <View style={{ height: 1, backgroundColor: colors.divider, marginVertical: 10 }} />;
-
-const BackBtn: React.FC<{ onPress: () => void }> = ({ onPress }) => (
-  <TouchableOpacity onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} testID="premium-back-btn" activeOpacity={0.7}>
-    <Ionicons name="arrow-back" size={20} color={colors.text} />
-    <Text style={{ fontWeight: '600', color: colors.text, fontSize: 14 }}>Back</Text>
-  </TouchableOpacity>
-);
 
 const s = StyleSheet.create({
   starIcon: { width: 76, height: 76, borderRadius: 22, backgroundColor: colors.premiumSoft, alignItems: 'center', justifyContent: 'center' },

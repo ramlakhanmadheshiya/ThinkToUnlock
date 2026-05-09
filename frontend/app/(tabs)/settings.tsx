@@ -1,49 +1,42 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Modal, KeyboardAvoidingView, Platform, TouchableOpacity, TouchableWithoutFeedback, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Modal, KeyboardAvoidingView, Platform, TouchableOpacity, TouchableWithoutFeedback, Alert, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '../../src/components/Icon';
 import { BrutalButton, BrutalCard, BrutalInput, Heading } from '../../src/components/Brutal';
 import { useAppState } from '../../src/store/StateContext';
 import { colors, shadow, radius } from '../../src/theme';
 
+const PREMIUM_FEATURES: { id: string; route: string; icon: string; title: string; desc: string }[] = [
+  { id: 'daily', route: '/premium-daily', icon: 'time-outline', title: 'Daily Time Top-Up', desc: 'Auto-deposit time into specific apps every day at a chosen hour. Treated as a separate allowance.' },
+  { id: 'quota', route: '/premium-quota', icon: 'trophy-outline', title: 'Minimum Daily Quota', desc: 'Force N challenges before any locked app can open. With per-app exclude list (e.g. WhatsApp).' },
+  { id: 'focus', route: '/premium-focus', icon: 'school-outline', title: 'Strict Focus Mode', desc: 'Define no-unlock hours. Time earned during these hours stays in the wallet for later.' },
+  { id: 'pass', route: '/premium-pass-rate', icon: 'speedometer-outline', title: 'Custom Pass Rates', desc: 'Raise required passing score for games from 60% up to 95%.' },
+  { id: 'weekly', route: '/premium-weekly', icon: 'calendar-outline', title: 'Weekly Time Top-Up', desc: 'Bonus time on Sat/Sun, auto-resets Monday 12 AM.' },
+];
+
 export default function SettingsTab() {
   const router = useRouter();
-  const { state, setParentPassword, resetAll, setMinDailyChallenges } = useAppState();
+  const { state, setParentPassword, resetAll, setSmartReminders } = useAppState();
   const [unlocked, setUnlocked] = useState(false);
   const [gatePw, setGatePw] = useState('');
   const [gateErr, setGateErr] = useState('');
-
   const [showChange, setShowChange] = useState(false);
   const [showReset, setShowReset] = useState(false);
-  const [showMin, setShowMin] = useState(false);
   const [cur, setCur] = useState('');
   const [npw, setNpw] = useState('');
   const [npw2, setNpw2] = useState('');
   const [err, setErr] = useState('');
   const [resetPw, setResetPw] = useState('');
-  const [minVal, setMinVal] = useState(String(state.minDailyChallenges));
 
-  // Auto-lock when navigating away
-  useFocusEffect(
-    useCallback(() => {
-      return () => {
-        setUnlocked(false);
-        setGatePw('');
-        setGateErr('');
-        setShowChange(false);
-        setShowReset(false);
-        setShowMin(false);
-      };
-    }, [])
-  );
+  useFocusEffect(useCallback(() => () => {
+    setUnlocked(false); setGatePw(''); setGateErr('');
+    setShowChange(false); setShowReset(false);
+  }, []));
 
   const tryUnlock = () => {
-    if (gatePw === state.parentPassword) {
-      setUnlocked(true); setGateErr(''); setGatePw('');
-    } else {
-      setGateErr('Wrong password');
-    }
+    if (gatePw === state.parentPassword) { setUnlocked(true); setGateErr(''); setGatePw(''); }
+    else setGateErr('Wrong password');
   };
 
   const submitChange = async () => {
@@ -51,16 +44,14 @@ export default function SettingsTab() {
     if (npw.length < 4) { setErr('New password must be at least 4 characters'); return; }
     if (npw !== npw2) { setErr('New passwords do not match'); return; }
     await setParentPassword(npw);
-    setShowChange(false);
-    setCur(''); setNpw(''); setNpw2(''); setErr('');
+    setShowChange(false); setCur(''); setNpw(''); setNpw2(''); setErr('');
     Alert.alert('Done', 'Password updated.');
   };
 
   const submitReset = async () => {
     if (resetPw !== state.parentPassword) { Alert.alert('Wrong password'); return; }
     await resetAll();
-    setShowReset(false);
-    setResetPw('');
+    setShowReset(false); setResetPw('');
     router.replace('/setup-password');
   };
 
@@ -74,15 +65,7 @@ export default function SettingsTab() {
             <Text style={s.sub}>Enter the parent password to access settings.</Text>
             <BrutalCard style={{ marginTop: 22 }}>
               <Text style={s.label}>Parent password</Text>
-              <BrutalInput
-                testID="settings-password-input"
-                value={gatePw}
-                onChangeText={(t) => { setGatePw(t); setGateErr(''); }}
-                placeholder="••••"
-                secureTextEntry
-                autoCapitalize="none"
-                error={!!gateErr}
-              />
+              <BrutalInput testID="settings-password-input" value={gatePw} onChangeText={(t) => { setGatePw(t); setGateErr(''); }} placeholder="••••" secureTextEntry autoCapitalize="none" error={!!gateErr} />
               {gateErr ? <Text style={s.err} testID="settings-password-error">{gateErr}</Text> : null}
               <BrutalButton title="Unlock" onPress={tryUnlock} full style={{ marginTop: 14 }} testID="settings-unlock-btn" />
             </BrutalCard>
@@ -106,52 +89,56 @@ export default function SettingsTab() {
         </View>
 
         <Text style={s.section}>Account</Text>
+        <RowAction icon="key-outline" title="Change parent password" subtitle="Update the gate password" onPress={() => setShowChange(true)} testID="settings-change-pw-btn" />
 
-        <Row
-          icon="key-outline"
-          title="Change parent password"
-          subtitle="Update the gate password"
-          onPress={() => setShowChange(true)}
-          testID="settings-change-pw-btn"
-        />
+        <Text style={s.section}>App Preferences</Text>
+        <View style={[s.row, shadow.card]} testID="smart-reminders-row">
+          <View style={s.rowIcon}><Ionicons name="notifications-outline" size={20} color={colors.text} /></View>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={s.rowTitle}>Smart Reminders</Text>
+            <Text style={s.rowSub}>Pre-lock notification 30 sec before any app locks</Text>
+          </View>
+          <Switch testID="smart-reminders-toggle" value={state.smartRemindersEnabled} onValueChange={setSmartReminders} trackColor={{ false: colors.borderDark, true: colors.primary }} thumbColor={'#fff'} />
+        </View>
 
-        {/* Premium subsection */}
-        <Text style={s.section}>
-          <Ionicons name="star" size={11} color={colors.premium} /> Premium Features
-        </Text>
-        <Text style={s.premHint}>{state.isPremium ? 'Premium active — all features unlocked.' : 'Tap any feature below to upgrade.'}</Text>
+        <View style={s.premBanner}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="star" size={14} color={colors.premium} />
+            <Text style={s.premLabel}>Premium Features</Text>
+          </View>
+          <Text style={s.premHint}>{state.isPremium ? 'Premium active — all features unlocked.' : 'Tap any feature to upgrade.'}</Text>
+        </View>
 
-        <PremiumRow
-          unlocked={state.isPremium}
-          icon="time-outline"
-          title="Daily auto top-up"
-          subtitle="Auto-add time per app at midnight"
-          onPress={() => router.push('/premium')}
-          testID="premium-feature-daily"
-        />
-        <PremiumRow
-          unlocked={state.isPremium}
-          icon="trophy-outline"
-          title={`Min challenges per day${state.isPremium ? `: ${state.minDailyChallenges}` : ''}`}
-          subtitle={state.isPremium ? 'Tap to change' : 'Force a daily brain-game minimum'}
-          onPress={() => state.isPremium ? setShowMin(true) : router.push('/premium')}
-          testID="settings-min-challenges-btn"
-        />
-        <PremiumRow
-          unlocked={state.isPremium}
-          icon="bar-chart-outline"
-          title="Full history"
-          subtitle="Unlimited play history"
-          onPress={() => router.push('/premium')}
-          testID="premium-feature-history"
-        />
+        {PREMIUM_FEATURES.map((f) => (
+          <TouchableOpacity
+            key={f.id}
+            testID={`premium-feature-${f.id}`}
+            activeOpacity={0.7}
+            onPress={() => state.isPremium ? router.push(f.route as never) : router.push('/premium')}
+            style={[s.row, shadow.card]}
+          >
+            <View style={[s.rowIcon, { backgroundColor: colors.premiumSoft }]}>
+              <Ionicons name={f.icon} size={20} color={colors.premium} />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={s.rowTitle}>{f.title}</Text>
+                <Ionicons name="star" size={11} color={colors.premium} />
+              </View>
+              <Text style={s.rowSub} numberOfLines={2}>{f.desc}</Text>
+            </View>
+            {state.isPremium
+              ? <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
+              : <Ionicons name="lock-closed" size={16} color={colors.premium} />}
+          </TouchableOpacity>
+        ))}
 
         {!state.isPremium && (
           <BrutalButton
             title="Upgrade to Premium"
             onPress={() => router.push('/premium')}
             full
-            style={{ marginTop: 16 }}
+            style={{ marginTop: 12 }}
             bg={colors.premium}
             testID="upgrade-premium-btn"
             icon={<Ionicons name="star" size={16} color="#fff" />}
@@ -159,17 +146,9 @@ export default function SettingsTab() {
         )}
 
         <Text style={s.section}>Danger zone</Text>
+        <RowAction icon="trash-outline" title="Reset app" subtitle="Wipe all data, history, and settings" onPress={() => setShowReset(true)} danger testID="settings-reset-btn" />
 
-        <Row
-          icon="trash-outline"
-          title="Reset app"
-          subtitle="Wipe all data, history, and settings"
-          onPress={() => setShowReset(true)}
-          danger
-          testID="settings-reset-btn"
-        />
-
-        <Text style={s.footer}>ThinkToUnlock · v1.1</Text>
+        <Text style={s.footer}>ThinkToUnlock · v1.2</Text>
       </ScrollView>
 
       {/* Change password modal */}
@@ -217,37 +196,12 @@ export default function SettingsTab() {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
-
-      {/* Min challenges modal */}
-      <Modal visible={showMin} transparent animationType="fade" onRequestClose={() => setShowMin(false)}>
-        <TouchableWithoutFeedback onPress={() => setShowMin(false)}>
-          <View style={s.modalBg}>
-            <TouchableWithoutFeedback>
-              <View style={[s.modalCard, shadow.raised]} testID="min-challenges-modal">
-                <Heading level={2}>Min challenges</Heading>
-                <Text style={s.sub}>How many brain games must be completed daily before any locked app can open?</Text>
-                <BrutalInput testID="min-challenges-input" value={minVal} onChangeText={setMinVal} keyboardType="number-pad" placeholder="0" style={{ marginTop: 14 }} />
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-                  <BrutalButton title="Cancel" onPress={() => setShowMin(false)} variant="soft" bg={colors.surfaceAlt} fg={colors.text} style={{ flex: 1 }} testID="min-cancel-btn" />
-                  <BrutalButton title="Save" onPress={async () => { await setMinDailyChallenges(parseInt(minVal || '0', 10) || 0); setShowMin(false); }} style={{ flex: 1 }} testID="min-save-btn" />
-                </View>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
     </SafeAreaView>
   );
 }
 
-// ---- Row Components ----
-const Row: React.FC<{
-  icon: keyof typeof import('@expo/vector-icons').Ionicons.glyphMap;
-  title: string;
-  subtitle: string;
-  onPress: () => void;
-  danger?: boolean;
-  testID?: string;
+const RowAction: React.FC<{
+  icon: string; title: string; subtitle: string; onPress: () => void; danger?: boolean; testID?: string;
 }> = ({ icon, title, subtitle, onPress, danger, testID }) => (
   <TouchableOpacity onPress={onPress} testID={testID} activeOpacity={0.7} style={[s.row, shadow.card]}>
     <View style={[s.rowIcon, danger && { backgroundColor: colors.errorSoft }]}>
@@ -261,55 +215,23 @@ const Row: React.FC<{
   </TouchableOpacity>
 );
 
-const PremiumRow: React.FC<{
-  icon: keyof typeof import('@expo/vector-icons').Ionicons.glyphMap;
-  title: string;
-  subtitle: string;
-  onPress: () => void;
-  unlocked: boolean;
-  testID?: string;
-}> = ({ icon, title, subtitle, onPress, unlocked, testID }) => (
-  <TouchableOpacity onPress={onPress} testID={testID} activeOpacity={0.7} style={[s.row, shadow.card]}>
-    <View style={[s.rowIcon, { backgroundColor: colors.premiumSoft }]}>
-      <Ionicons name={icon} size={20} color={colors.premium} />
-    </View>
-    <View style={{ flex: 1, marginLeft: 12 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <Text style={s.rowTitle}>{title}</Text>
-        <Ionicons name="star" size={11} color={colors.premium} />
-      </View>
-      <Text style={s.rowSub}>{subtitle}</Text>
-    </View>
-    {unlocked ? <Ionicons name="chevron-forward" size={18} color={colors.textLight} /> : <Ionicons name="lock-closed" size={16} color={colors.premium} />}
-  </TouchableOpacity>
-);
-
 const s = StyleSheet.create({
   gateIcon: { width: 64, height: 64, borderRadius: 18, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   sub: { color: colors.textMuted, fontWeight: '500', fontSize: 14, marginTop: 6, lineHeight: 20 },
   label: { color: colors.text, fontWeight: '600', fontSize: 13, marginTop: 12, marginBottom: 8 },
   err: { color: colors.error, fontWeight: '600', marginTop: 8, fontSize: 13 },
-
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6 },
   lockBtn: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-
   section: { fontSize: 11, fontWeight: '700', color: colors.textMuted, letterSpacing: 1, textTransform: 'uppercase', marginTop: 24, marginBottom: 10 },
-  premHint: { color: colors.textMuted, fontSize: 12, marginBottom: 10, marginTop: -4 },
-
-  row: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: 14,
-    marginBottom: 10,
-  },
+  premBanner: { marginTop: 24, marginBottom: 8 },
+  premLabel: { fontSize: 11, fontWeight: '700', color: colors.premium, letterSpacing: 1, textTransform: 'uppercase' },
+  premHint: { color: colors.textMuted, fontSize: 12, marginTop: 4 },
+  row: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg, padding: 14, marginBottom: 10 },
   rowIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   rowTitle: { fontWeight: '600', color: colors.text, fontSize: 14 },
-  rowSub: { fontWeight: '500', color: colors.textMuted, fontSize: 12, marginTop: 2 },
-
+  rowSub: { fontWeight: '500', color: colors.textMuted, fontSize: 12, marginTop: 2, lineHeight: 17 },
   modalBg: { flex: 1, backgroundColor: 'rgba(15,15,15,0.55)', alignItems: 'center', justifyContent: 'center', padding: 22 },
   modalCard: { backgroundColor: colors.surface, borderRadius: radius.xl, padding: 22, width: '100%', maxWidth: 380 },
   dangerIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.errorSoft, alignItems: 'center', justifyContent: 'center' },
-
   footer: { textAlign: 'center', color: colors.textLight, fontWeight: '500', marginTop: 30, fontSize: 11 },
 });

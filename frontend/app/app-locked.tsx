@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, AppState as RNAppState, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '../src/components/Icon';
 import { BrutalButton, BrutalCard, Heading } from '../src/components/Brutal';
 import { useAppState } from '../src/store/StateContext';
 import { MOCK_APPS } from '../src/data/mockApps';
@@ -11,9 +11,13 @@ import { colors, shadow, radius } from '../src/theme';
 export default function AppLockedScreen() {
   const router = useRouter();
   const { appId } = useLocalSearchParams<{ appId: string }>();
-  const { state, decrementAppSeconds } = useAppState();
+  const { state, decrementAppPools } = useAppState();
   const app = MOCK_APPS.find((a) => a.id === appId);
-  const [secLeft, setSecLeft] = useState<number>(state.apps[appId || '']?.timeRemainingSec || 0);
+  const [secLeft, setSecLeft] = useState<number>(
+    (state.apps[appId || '']?.timeRemainingSec || 0) +
+    (state.apps[appId || '']?.dailyTopupSec || 0) +
+    (state.apps[appId || '']?.weeklyTopupSec || 0)
+  );
   const [paused, setPaused] = useState(false);
   const [warned30, setWarned30] = useState(false);
   const [showWarning, setShowWarning] = useState(false);
@@ -29,13 +33,13 @@ export default function AppLockedScreen() {
           setWarned30(true);
           setTimeout(() => setShowWarning(false), 5000);
         }
-        if (appId) decrementAppSeconds(appId, 1);
+        if (appId) decrementAppPools(appId, 1);
         if (next === 0 && timerRef.current) clearInterval(timerRef.current);
         return next;
       });
     }, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [paused, appId, warned30, decrementAppSeconds]);
+  }, [paused, appId, warned30, decrementAppPools]);
 
   useEffect(() => {
     const sub = RNAppState.addEventListener('change', (s) => setPaused(s !== 'active'));

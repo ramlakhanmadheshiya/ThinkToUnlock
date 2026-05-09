@@ -2,7 +2,7 @@
 // Props: { difficulty, onComplete(scorePercent: number) }
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Text, View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '../components/Icon';
 import { colors, shadow, radius } from '../theme';
 import { Difficulty } from '../data/games';
 import { BrutalCard, BrutalButton } from '../components/Brutal';

@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '../../src/components/Icon';
 import { BrutalButton, BrutalCard, Heading } from '../../src/components/Brutal';
-import { GAMES, DIFFICULTY_REWARD, PASS_THRESHOLD, Difficulty, QUOTES_WIN, QUOTES_LOSS } from '../../src/data/games';
+import { GAMES, DIFFICULTY_REWARD, Difficulty, QUOTES_WIN, QUOTES_LOSS } from '../../src/data/games';
 import { useAppState } from '../../src/store/StateContext';
 import { colors, shadow, radius } from '../../src/theme';
 import { MemoryMatch, MathQuiz, WordScramble, PatternRecall, NumberSequence } from '../../src/games/AllGames';
@@ -34,7 +34,8 @@ export default function GamePage() {
 
   const handleComplete = async (sc: number) => {
     setScore(sc);
-    if (sc >= PASS_THRESHOLD) {
+    const passThreshold = state.isPremium ? state.passRatePercent : 60;
+    if (sc >= passThreshold) {
       const reward = DIFFICULTY_REWARD[difficulty];
       await addWalletMinutes(reward);
       await incrementDailyChallenges();
@@ -62,7 +63,7 @@ export default function GamePage() {
             </View>
             <Heading level={1} style={{ textAlign: 'center', marginTop: 18 }}>{game.name}</Heading>
             <Text style={s.proveText}>
-              Prove you're focused. Score at least <Text style={{ color: colors.primary, fontWeight: '700' }}>60%</Text> to pass and unlock your app.
+              Prove you're focused. Score at least <Text style={{ color: colors.primary, fontWeight: '700' }}>{state.isPremium ? state.passRatePercent : 60}%</Text> to pass and unlock your app.
             </Text>
           </View>
 
