@@ -30,13 +30,8 @@ export default function AppLockedScreen() {
           setWarned30(true);
           setTimeout(() => setShowWarning(false), 5000);
         }
-        // Persist every 5s OR final
-        if (next % 5 === 0 || next === 0) {
-          if (appId) decrementAppSeconds(appId, prev - next || 1);
-        }
-        if (next === 0) {
-          if (timerRef.current) clearInterval(timerRef.current);
-        }
+        if (appId) decrementAppSeconds(appId, 1);
+        if (next === 0 && timerRef.current) clearInterval(timerRef.current);
         return next;
       });
     }, 1000);

@@ -1,11 +1,10 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { AppState as RNAppState } from 'react-native';
 import { AppState, defaultState, loadState, saveState, HistoryEntry, todayStr } from './storage';
 
 type Ctx = {
   state: AppState;
   ready: boolean;
-  update: (patch: Partial<AppState>) => Promise<void>;
   setParentPassword: (pw: string) => Promise<void>;
   addWalletMinutes: (mins: number) => Promise<void>;
   consumeWalletMinutesToApp: (appId: string, mins: number) => Promise<boolean>;
@@ -26,11 +25,31 @@ const StateContext = createContext<Ctx | null>(null);
 export function StateProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AppState>(defaultState());
   const [ready, setReady] = useState(false);
+  // Ref always holds latest state — used by actions to avoid stale closures
+  const stateRef = useRef<AppState>(state);
+  // Serialize writes so concurrent calls don't race
+  const writeChainRef = useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => { stateRef.current = state; }, [state]);
+
+  const persist = useCallback(async (mutator: (cur: AppState) => AppState) => {
+    // Chain writes
+    const next = writeChainRef.current.then(async () => {
+      const cur = stateRef.current;
+      const updated = mutator(cur);
+      stateRef.current = updated;
+      setState(updated);
+      await saveState(updated);
+    });
+    writeChainRef.current = next.catch(() => undefined);
+    return next;
+  }, []);
 
   const reload = useCallback(async () => {
     const s = await loadState();
+    stateRef.current = s;
     setState(s);
-    await saveState(s); // persist any auto-updates (daily reset, top-up)
+    await saveState(s);
   }, []);
 
   useEffect(() => {
@@ -40,7 +59,6 @@ export function StateProvider({ children }: { children: React.ReactNode }) {
     })();
   }, [reload]);
 
-  // Reload on app foreground (in case midnight passed)
   useEffect(() => {
     const sub = RNAppState.addEventListener('change', (s) => {
       if (s === 'active') reload();
@@ -48,97 +66,102 @@ export function StateProvider({ children }: { children: React.ReactNode }) {
     return () => sub.remove();
   }, [reload]);
 
-  const persist = useCallback(async (next: AppState) => {
-    setState(next);
-    await saveState(next);
-  }, []);
-
-  const update = useCallback(async (patch: Partial<AppState>) => {
-    const next = { ...state, ...patch };
-    await persist(next);
-  }, [state, persist]);
-
   const setParentPassword = useCallback(async (pw: string) => {
-    await persist({ ...state, parentPassword: pw });
-  }, [state, persist]);
+    await persist((cur) => ({ ...cur, parentPassword: pw }));
+  }, [persist]);
 
   const addWalletMinutes = useCallback(async (mins: number) => {
-    await persist({ ...state, timeWalletMinutes: state.timeWalletMinutes + mins });
-  }, [state, persist]);
+    await persist((cur) => ({ ...cur, timeWalletMinutes: cur.timeWalletMinutes + mins }));
+  }, [persist]);
 
-  const consumeWalletMinutesToApp = useCallback(async (appId: string, mins: number) => {
-    if (state.timeWalletMinutes < mins) return false;
-    const apps = { ...state.apps };
-    apps[appId] = { ...apps[appId], timeRemainingSec: apps[appId].timeRemainingSec + mins * 60 };
-    await persist({ ...state, timeWalletMinutes: state.timeWalletMinutes - mins, apps });
+  const consumeWalletMinutesToApp = useCallback(async (appId: string, mins: number): Promise<boolean> => {
+    if (stateRef.current.timeWalletMinutes < mins) return false;
+    await persist((cur) => {
+      if (cur.timeWalletMinutes < mins) return cur;
+      const apps = { ...cur.apps };
+      apps[appId] = { ...apps[appId], timeRemainingSec: apps[appId].timeRemainingSec + mins * 60 };
+      return { ...cur, timeWalletMinutes: cur.timeWalletMinutes - mins, apps };
+    });
     return true;
-  }, [state, persist]);
+  }, [persist]);
 
   const refundAppMinutesToWallet = useCallback(async (appId: string, mins: number) => {
-    const apps = { ...state.apps };
-    const have = Math.floor(apps[appId].timeRemainingSec / 60);
-    const give = Math.min(have, mins);
-    apps[appId] = { ...apps[appId], timeRemainingSec: apps[appId].timeRemainingSec - give * 60 };
-    await persist({ ...state, timeWalletMinutes: state.timeWalletMinutes + give, apps });
-  }, [state, persist]);
+    await persist((cur) => {
+      const apps = { ...cur.apps };
+      const have = Math.floor(apps[appId].timeRemainingSec / 60);
+      const give = Math.min(have, mins);
+      apps[appId] = { ...apps[appId], timeRemainingSec: apps[appId].timeRemainingSec - give * 60 };
+      return { ...cur, timeWalletMinutes: cur.timeWalletMinutes + give, apps };
+    });
+  }, [persist]);
 
-  const decrementAppSeconds = useCallback(async (appId: string, seconds: number) => {
-    const apps = { ...state.apps };
-    const cur = apps[appId].timeRemainingSec;
-    const next = Math.max(0, cur - seconds);
-    apps[appId] = { ...apps[appId], timeRemainingSec: next };
-    await persist({ ...state, apps });
-    return next;
-  }, [state, persist]);
+  const decrementAppSeconds = useCallback(async (appId: string, seconds: number): Promise<number> => {
+    let result = 0;
+    await persist((cur) => {
+      const apps = { ...cur.apps };
+      const cu = apps[appId].timeRemainingSec;
+      const next = Math.max(0, cu - seconds);
+      result = next;
+      apps[appId] = { ...apps[appId], timeRemainingSec: next };
+      return { ...cur, apps };
+    });
+    return result;
+  }, [persist]);
 
   const toggleAppLock = useCallback(async (appId: string, locked: boolean) => {
-    const apps = { ...state.apps };
-    apps[appId] = { ...apps[appId], locked };
-    await persist({ ...state, apps });
-  }, [state, persist]);
+    await persist((cur) => {
+      const apps = { ...cur.apps };
+      apps[appId] = { ...apps[appId], locked };
+      return { ...cur, apps };
+    });
+  }, [persist]);
 
   const setAppDailyDefault = useCallback(async (appId: string, mins: number) => {
-    const apps = { ...state.apps };
-    apps[appId] = { ...apps[appId], defaultDailyMinutes: mins };
-    await persist({ ...state, apps });
-  }, [state, persist]);
+    await persist((cur) => {
+      const apps = { ...cur.apps };
+      apps[appId] = { ...apps[appId], defaultDailyMinutes: mins };
+      return { ...cur, apps };
+    });
+  }, [persist]);
 
   const recordHistory = useCallback(async (entry: Omit<HistoryEntry, 'id' | 'timestamp'>) => {
-    const item: HistoryEntry = {
-      ...entry,
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      timestamp: Date.now(),
-    };
-    const history = [item, ...state.history].slice(0, 200);
-    await persist({ ...state, history });
-  }, [state, persist]);
+    await persist((cur) => {
+      const item: HistoryEntry = {
+        ...entry,
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        timestamp: Date.now(),
+      };
+      return { ...cur, history: [item, ...cur.history].slice(0, 200) };
+    });
+  }, [persist]);
 
   const incrementDailyChallenges = useCallback(async () => {
-    const today = todayStr();
-    const reset = state.lastChallengeResetDate !== today;
-    await persist({
-      ...state,
-      dailyChallengesCompleted: (reset ? 0 : state.dailyChallengesCompleted) + 1,
-      lastChallengeResetDate: today,
+    await persist((cur) => {
+      const today = todayStr();
+      const reset = cur.lastChallengeResetDate !== today;
+      return {
+        ...cur,
+        dailyChallengesCompleted: (reset ? 0 : cur.dailyChallengesCompleted) + 1,
+        lastChallengeResetDate: today,
+      };
     });
-  }, [state, persist]);
+  }, [persist]);
 
   const setPremium = useCallback(async (premium: boolean) => {
-    await persist({ ...state, isPremium: premium });
-  }, [state, persist]);
+    await persist((cur) => ({ ...cur, isPremium: premium }));
+  }, [persist]);
 
   const setMinDailyChallenges = useCallback(async (n: number) => {
-    await persist({ ...state, minDailyChallenges: n });
-  }, [state, persist]);
+    await persist((cur) => ({ ...cur, minDailyChallenges: n }));
+  }, [persist]);
 
   const resetAll = useCallback(async () => {
-    const fresh = defaultState();
-    await persist(fresh);
+    await persist(() => defaultState());
   }, [persist]);
 
   return (
     <StateContext.Provider value={{
-      state, ready, update, setParentPassword, addWalletMinutes,
+      state, ready, setParentPassword, addWalletMinutes,
       consumeWalletMinutesToApp, refundAppMinutesToWallet, decrementAppSeconds,
       toggleAppLock, setAppDailyDefault, recordHistory, incrementDailyChallenges,
       setPremium, setMinDailyChallenges, resetAll, reload,
