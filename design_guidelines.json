@@ -1,0 +1,123 @@
+{
+  "theme_and_archetype": {
+    "theme_name": "Neo-Brutalist Focus",
+    "archetype": "Archetype 3 (Pastel & Soft) modified with Swiss Brutalism",
+    "tone": "Playful, Strict, Graphic, Energetic",
+    "background": "off-white"
+  },
+  "color_palette": {
+    "background": "#F5F1E8",
+    "primary": "#E04D36",
+    "primary_hover": "#C93C27",
+    "text_main": "#0A0A0A",
+    "accent_yellow": "#FDE047",
+    "accent_mint": "#A3E635",
+    "border_black": "#0A0A0A",
+    "surface": "#FFFFFF",
+    "disabled": "#D1D5DB"
+  },
+  "typography": {
+    "headings": {
+      "font_family": "Archivo Black, Cabinet Grotesk, sans-serif",
+      "font_weight": "900",
+      "letter_spacing": "tracking-tighter"
+    },
+    "body": {
+      "font_family": "DM Sans, sans-serif",
+      "font_weight": "500",
+      "letter_spacing": "tracking-normal"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl uppercase leading-none",
+      "h2": "text-2xl sm:text-3xl uppercase leading-tight",
+      "h3": "text-xl sm:text-2xl uppercase",
+      "h4": "text-lg font-bold uppercase",
+      "body": "text-base font-medium",
+      "caption": "text-sm font-bold uppercase"
+    }
+  },
+  "spacing_and_layout": {
+    "philosophy": "Chunky, solid, generous padding, un-apologetically heavy",
+    "borders": "border-4 border-black",
+    "shadows": {
+      "default": "shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]",
+      "sm": "shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]",
+      "hover": "shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
+      "active": "shadow-none translate-x-[6px] translate-y-[6px]"
+    },
+    "border_radius": "rounded-none lg:rounded-xl",
+    "container_padding": "p-6 sm:p-8"
+  },
+  "components": {
+    "button": {
+      "base": "border-4 border-black bg-primary text-white font-black uppercase transition-all duration-75",
+      "shadow": "shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]",
+      "active": "active:shadow-none active:translate-x-[4px] active:translate-y-[4px]",
+      "variants": {
+        "secondary": "bg-accent_yellow text-black",
+        "outline": "bg-background text-black"
+      }
+    },
+    "card": {
+      "base": "border-4 border-black bg-surface p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]"
+    },
+    "input": {
+      "base": "border-4 border-black bg-white p-4 font-bold focus:outline-none focus:ring-0 focus:shadow-[4px_4px_0px_0px_rgba(224,77,54,1)]"
+    },
+    "tab_bar": {
+      "base": "fixed bottom-0 w-full border-t-4 border-black bg-surface flex justify-around p-4 z-50",
+      "item": "flex flex-col items-center justify-center font-bold uppercase text-xs gap-1",
+      "active_indicator": "border-b-4 border-primary"
+    },
+    "difficulty_pill": {
+      "base": "border-2 border-black font-bold uppercase px-3 py-1 text-sm shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]",
+      "easy": "bg-accent_mint",
+      "medium": "bg-accent_yellow",
+      "hard": "bg-primary text-white"
+    }
+  },
+  "screens": {
+    "HOME": {
+      "description": "Dashboard view. Contains Time Wallet, Locked App Cards, Daily Challenges.",
+      "time_wallet": "Hero card at the top. Massive text showing minutes. 'Add Time' button opens games.",
+      "locked_apps": "List of apps with lock icons. Include +/- brutalist buttons to allocate time from wallet.",
+      "daily_challenges": "Counter pill top right."
+    },
+    "GAME": {
+      "description": "Library of 20 brain games + states.",
+      "start_screen": "Hero graphic, 'Prove you're focused. Score at least 60%...', Difficulty selector, Start button.",
+      "win_screen": "'Challenge Passed!' Title, Score card, playful quote, Play Again/Back buttons.",
+      "loss_screen": "'Don't quit, almost there!', Try Again/Back buttons."
+    },
+    "MANAGE_APPS": {
+      "description": "Parent gate protected area.",
+      "password_modal": "Heavy brutalist modal overlay.",
+      "app_list": "Toggle list (lock/unlock) with switch components that have thick borders."
+    },
+    "SETTINGS": {
+      "description": "Config screen.",
+      "features": "Change password, reset, mock premium paywall ('Go Pro' with yellow accent)."
+    }
+  },
+  "icons": {
+    "library": "lucide-react",
+    "stroke_width": "3"
+  },
+  "image_urls": {
+    "hero_background": {
+      "url": "https://images.unsplash.com/photo-1762755647813-017e128a4ba0",
+      "description": "Terracotta abstract minimal background for the premium section."
+    },
+    "game_puzzle": {
+      "url": "https://images.unsplash.com/photo-1605902394069-ff2ae2430e62",
+      "description": "Rubik's cube representation for brain games category."
+    },
+    "locked_overlay": {
+      "url": "https://images.pexels.com/photos/11391947/pexels-photo-11391947.jpeg",
+      "description": "Chained smartphone representation for the App Locked Overlay screen."
+    }
+  },
+  "testing_rules": {
+    "data_testid": "MANDATORY on all buttons, links, inputs, and interactive cards. Use kebab-case."
+  }
+}
