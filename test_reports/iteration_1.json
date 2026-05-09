@@ -1,0 +1,47 @@
+{
+  "summary": "Frontend-only iteration 1. Tested first-launch password setup, home/games/manage/settings/premium flows on mobile viewport (390x844). Most flows render and navigate correctly. CRITICAL BUG found: after winning a brain game (math quiz, scored 100%), the time wallet stays at 0 and the daily challenges counter stays at 0 on the home screen. RCA points to a stale-closure bug in StateContext.tsx where sequential awaited state updates overwrite each other.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "StateContext / GamePage(handleComplete)",
+        "issue": "After passing a game (>=60%), the win screen correctly says '+5 MIN ADDED', but on returning to Home the time-wallet shows 0 and the 'X DONE TODAY' pill stays at 0. Only history persists. addWalletMinutes + incrementDailyChallenges + recordHistory are awaited in sequence, but each useCallback captures `state` from its own closure and calls persist({...state, ...}), so each subsequent persist overwrites prior fields with stale values.",
+        "testID": "wallet-minutes-text, daily-challenges-pill",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Game win -> wallet credit -> home reflection",
+        "issue": "Reward minutes and daily challenge increment are dropped due to overlapping state mutations. Only the last persist call (recordHistory) survives.",
+        "affected_testIDs": ["wallet-minutes-text", "daily-challenges-pill", "result-score-text"]
+      }
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "FIX (high priority) StateContext.tsx stale-closure bug. Recommended fix: refactor `persist` to accept an updater function and use functional setState, OR keep a `stateRef` that is always up-to-date and have every callback read from `stateRef.current` instead of the captured `state` prop. Example: const stateRef = useRef(state); useEffect(() => { stateRef.current = state; }, [state]); then in persist: const next = updater(stateRef.current); setState(next); await saveState(next).",
+    "Re-test win flow end-to-end after the fix: math quiz easy win -> wallet should show +5, daily pill should show 1 done, history should still contain the entry, then on second win wallet=10, pill=2. Also retest +/- buttons and locked-app countdown to ensure they don't suffer from the same closure pattern (consumeWalletMinutesToApp / refundAppMinutesToWallet / decrementAppSeconds also use the same stale-state pattern and may behave incorrectly when called rapidly).",
+    "Verify: tap on `time-wallet-card` is partially obscured by the bottom tab bar in the web preview viewport when the wallet card is the first scroll position (Playwright reported 'Element is not visible' once). Consider increasing ScrollView paddingBottom from 30 to ~110 so content above the tab bar isn't half-hidden after tabs change."
+  ],
+  "critical_code_review_comments": [
+    "src/store/StateContext.tsx: Every action useCallback (addWalletMinutes, incrementDailyChallenges, recordHistory, consumeWalletMinutesToApp, refundAppMinutesToWallet, decrementAppSeconds, toggleAppLock, setAppDailyDefault, setParentPassword, setPremium, setMinDailyChallenges) closes over `state`. When two such actions are awaited back-to-back in the same tick (as in game/[id].tsx handleComplete), the second uses the original `state`, not the updated one, and its persist call clobbers the first. This is the root cause of the failed wallet credit.",
+    "app/app-locked.tsx decrementAppSeconds is invoked from inside a setInterval which references the captured `decrementAppSeconds` callback that closes over the initial state — over a long countdown this will keep persisting based on stale state and may corrupt other fields (e.g., overwriting walletMinutes back to whatever it was when the screen mounted). Same RCA as above.",
+    "app/(tabs)/home.tsx: TIME WALLET card lower edge is occluded by the bottom tab bar. Consider extra bottom padding."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (not tested per request)",
+    "frontend": "~80% (setup flow, validation, navigation, game UI, manage gate, settings modals, premium screen all work; wallet credit on win is broken)"
+  },
+  "seed_data_creation": "None. App uses AsyncStorage; localStorage was cleared at start.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Use mobile viewport 390x844. Visit https://focus-unlock-8.preview.emergentagent.com, clear localStorage to force first-launch screen, set password 1234/1234. Then go to Games -> Math Quiz -> Easy -> Start. Math choices have testID math-choice-{0..3}; correct answers compute as a+b/-/*. After 8 correct answers expect result-score-text to show '100%' and wallet on home to be +5 and daily pill to be '1 DONE TODAY'. If still 0, the StateContext stale-closure issue isn't fixed. testIDs: setup-password-input, setup-password-confirm-input, setup-password-submit-btn, time-wallet-card, wallet-minutes-text, daily-challenges-pill, app-card-{id}, app-plus-{id}, app-minus-{id}, app-open-{id}, no-time-modal, warn-play-game-btn, random-challenge-btn, game-card-{id}, difficulty-{easy|medium|hard}, start-challenge-btn, math-choice-{i}, result-score-text, result-again-btn, result-home-btn, manage-password-input, manage-unlock-btn, manage-toggle-{id}, settings-change-pw-btn, change-current-input, change-new-input, change-confirm-input, change-submit-btn, settings-reset-btn, reset-password-input, reset-confirm-btn, premium-pass-btn, premium-fail-btn, countdown-text, close-app-btn.",
+  "rca_of_issue": "StateContext.tsx defines actions like addWalletMinutes/incrementDailyChallenges/recordHistory using useCallback that depend on [state, persist]. handleComplete in app/game/[id].tsx awaits all three sequentially. After the first await, React schedules a state update but the JS closures of the still-cached useCallbacks (created with the *previous* state) are unchanged within this microtask sequence. So incrementDailyChallenges runs `persist({ ...state /*old*/, dailyChallengesCompleted: 1 })`, which writes back the OLD walletMinutes (0). recordHistory does the same and re-clobbers challenges back to 0. Reproduction: setup password, play Math Quiz Easy, answer all correctly -> result shows 100% / +5 MIN ADDED, but Home shows wallet=0 and pill=0. Mitigation: convert persist to use functional updater (setState(prev => next), saveState off the new value) and have every action call persist((prev)=>({...prev, fieldUpdate})) rather than spreading captured `state`. Or maintain a stateRef ref to always read latest synchronous state inside actions."
+}
