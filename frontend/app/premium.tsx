@@ -11,7 +11,7 @@ const FEATURES = [
   { icon: 'time-outline', title: 'Daily Time Top-Up', desc: 'Auto-deposits time into specific apps every day at a chosen hour. Treated as a separate allowance — wallet time depletes first.' },
   { icon: 'trophy-outline', title: 'Minimum Daily Quota', desc: 'Force N challenges before any locked app can open. With per-app exclude list (e.g. WhatsApp, Phone).' },
   { icon: 'school-outline', title: 'Strict Focus Mode', desc: 'Define no-unlock hours for chosen apps. Time earned during these hours stays in the wallet for later.' },
-  { icon: 'speedometer-outline', title: 'Custom Pass Rates', desc: 'Raise required passing score for games from 60% up to 95%.' },
+  { icon: 'speedometer-outline', title: 'Custom Pass Rates', desc: 'Raise required passing score for games from 5% up to 100%.' },
   { icon: 'calendar-outline', title: 'Weekly Time Top-Up', desc: 'Bonus time on Sat/Sun, auto-resets Monday at 12 AM.' },
 ];
 

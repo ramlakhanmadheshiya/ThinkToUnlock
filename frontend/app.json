@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "frontend",
+    "name": "ThinkToUnlock",
     "slug": "frontend",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -14,9 +14,10 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000"
+        "backgroundColor": "#FAFAF9"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.ramlakhan0001.frontend"
     },
     "web": {
       "bundler": "metro",
@@ -28,10 +29,10 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/splash-image.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000"
+          "backgroundColor": "#FAFAF9"
         }
       ]
     ],

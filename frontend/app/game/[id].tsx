@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TouchableWithoutFeedback } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '../../src/components/Icon';
@@ -9,17 +9,18 @@ import { useAppState } from '../../src/store/StateContext';
 import { colors, shadow, radius } from '../../src/theme';
 import { MemoryMatch, MathQuiz, WordScramble, PatternRecall, NumberSequence } from '../../src/games/AllGames';
 
-type Stage = 'start' | 'play' | 'win' | 'loss';
+type Stage = 'start' | 'rules' | 'play' | 'win' | 'loss';
 
 export default function GamePage() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const game = GAMES.find((g) => g.id === id);
-  const { addWalletMinutes, recordHistory, incrementDailyChallenges } = useAppState();
+  const { state, addWalletMinutes, recordHistory, incrementDailyChallenges } = useAppState();
 
   const [stage, setStage] = useState<Stage>('start');
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   const [score, setScore] = useState(0);
+  const [showRulesModal, setShowRulesModal] = useState(false);
 
   if (!game) {
     return (
@@ -59,7 +60,7 @@ export default function GamePage() {
 
           <View style={{ alignItems: 'center', marginTop: 18 }}>
             <View style={[s.logoBox, { backgroundColor: game.color + '22' }]}>
-              <Text style={{ fontSize: 56 }}>{game.icon}</Text>
+              <Ionicons name={game.icon as any} size={50} color={game.color} />
             </View>
             <Heading level={1} style={{ textAlign: 'center', marginTop: 18 }}>{game.name}</Heading>
             <Text style={s.proveText}>
@@ -95,11 +96,76 @@ export default function GamePage() {
           </BrutalCard>
 
           <BrutalButton
+            title="Show Rules"
+            onPress={() => setStage('rules')}
+            full
+            style={{ marginTop: 22 }}
+            testID="show-rules-btn"
+            variant="soft"
+            bg={colors.surfaceAlt}
+            fg={colors.text}
+            icon={<Ionicons name="help-circle" size={18} color={colors.text} />}
+          />
+
+          <BrutalButton
             title="Start Challenge"
             onPress={() => setStage('play')}
             full
-            style={{ marginTop: 22 }}
+            style={{ marginTop: 12 }}
             testID="start-challenge-btn"
+            icon={<Ionicons name="play" size={18} color="#fff" />}
+          />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // ----- RULES -----
+  if (stage === 'rules') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 30 }}>
+          <TouchableOpacity onPress={() => setStage('start')} style={s.backBtn} testID="rules-back-btn" activeOpacity={0.7}>
+            <Ionicons name="arrow-back" size={20} color={colors.text} />
+            <Text style={s.backTxt}>Back</Text>
+          </TouchableOpacity>
+
+          <View style={{ alignItems: 'center', marginTop: 18 }}>
+            <View style={[s.logoBox, { backgroundColor: game.color + '22' }]}>
+              <Ionicons name={game.icon as any} size={50} color={game.color} />
+            </View>
+            <Heading level={1} style={{ textAlign: 'center', marginTop: 18 }}>{game.name}</Heading>
+          </View>
+
+          <BrutalCard style={{ marginTop: 18 }}>
+            <Text style={s.section}>How to Play</Text>
+            <Text style={{ color: colors.text, fontWeight: '500', fontSize: 14, lineHeight: 21, marginTop: 10 }}>
+              {game.rules || 'Instructions coming soon.'}
+            </Text>
+          </BrutalCard>
+
+          <BrutalCard style={{ marginTop: 14 }}>
+            <Text style={s.section}>Mark Calculation</Text>
+            <Text style={{ color: colors.text, fontWeight: '500', fontSize: 14, lineHeight: 21, marginTop: 10 }}>
+              {game.markCalculation || 'Scoring details coming soon.'}
+            </Text>
+          </BrutalCard>
+
+          <BrutalCard style={{ marginTop: 14, backgroundColor: colors.infoSoft }}>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Ionicons name="information-circle" size={20} color={colors.info} />
+              <Text style={{ color: colors.info, fontWeight: '600', fontSize: 13, flex: 1, lineHeight: 18 }}>
+                Score at least {state.isPremium ? state.passRatePercent : 60}% to pass and earn {DIFFICULTY_REWARD[difficulty]} minutes.
+              </Text>
+            </View>
+          </BrutalCard>
+
+          <BrutalButton
+            title="Ready to Play"
+            onPress={() => setStage('play')}
+            full
+            style={{ marginTop: 22 }}
+            testID="ready-btn"
             icon={<Ionicons name="play" size={18} color="#fff" />}
           />
         </ScrollView>
@@ -117,15 +183,59 @@ export default function GamePage() {
 
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, gap: 10 }}>
-          <Text style={{ fontWeight: '700', color: colors.text, fontSize: 16 }}>{game.name}</Text>
-          <View style={s.diffPill}><Text style={s.diffPillText}>{difficulty}</Text></View>
-          <View style={{ flex: 1 }} />
-          <TouchableOpacity onPress={() => setStage('start')} testID="play-back-btn" activeOpacity={0.7} style={s.closeBtn}>
-            <Ionicons name="close" size={22} color={colors.text} />
-          </TouchableOpacity>
+        <View style={{ flex: 1, flexDirection: 'column' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+            <Text style={{ fontWeight: '700', color: colors.text, fontSize: 16 }}>{game.name}</Text>
+            <View style={s.diffPill}><Text style={s.diffPillText}>{difficulty}</Text></View>
+            <View style={{ flex: 1 }} />
+            <TouchableOpacity onPress={() => setShowRulesModal(true)} testID="play-rules-btn" activeOpacity={0.7} style={s.infoBtn}>
+              <Ionicons name="information-circle" size={20} color={colors.info} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setStage('start')} testID="play-back-btn" activeOpacity={0.7} style={s.closeBtn}>
+              <Ionicons name="close" size={22} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+          <View style={{ flex: 1 }}>
+            <GameComp difficulty={difficulty} onComplete={handleComplete} key={`${game.id}-${difficulty}-${stage}`} />
+          </View>
         </View>
-        <GameComp difficulty={difficulty} onComplete={handleComplete} key={`${game.id}-${difficulty}-${stage}`} />
+
+        <Modal visible={showRulesModal} transparent animationType="fade" onRequestClose={() => setShowRulesModal(false)}>
+          <TouchableWithoutFeedback onPress={() => setShowRulesModal(false)}>
+            <View style={s.rulesModalBg}>
+              <TouchableWithoutFeedback>
+                <ScrollView contentContainerStyle={[s.rulesModal, shadow.raised]}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <Heading level={2}>Rules & Scoring</Heading>
+                    <TouchableOpacity onPress={() => setShowRulesModal(false)} activeOpacity={0.7}>
+                      <Ionicons name="close" size={24} color={colors.text} />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{ gap: 16 }}>
+                    <View>
+                      <Text style={{ fontWeight: '700', color: colors.text, fontSize: 15, marginBottom: 8 }}>How to Play</Text>
+                      <Text style={{ color: colors.text, fontWeight: '500', fontSize: 13, lineHeight: 20 }}>
+                        {game.rules || 'Instructions coming soon.'}
+                      </Text>
+                    </View>
+                    <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16 }}>
+                      <Text style={{ fontWeight: '700', color: colors.text, fontSize: 15, marginBottom: 8 }}>Mark Calculation</Text>
+                      <Text style={{ color: colors.text, fontWeight: '500', fontSize: 13, lineHeight: 20 }}>
+                        {game.markCalculation || 'Scoring details coming soon.'}
+                      </Text>
+                    </View>
+                    <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16 }}>
+                      <Text style={{ fontWeight: '700', color: colors.primary, fontSize: 15, marginBottom: 8 }}>Your Target</Text>
+                      <Text style={{ color: colors.text, fontWeight: '600', fontSize: 14 }}>
+                        Score at least <Text style={{ color: colors.primary }}>{state.isPremium ? state.passRatePercent : 60}%</Text> to pass and earn <Text style={{ color: colors.success }}>{DIFFICULTY_REWARD[difficulty]} minutes</Text>
+                      </Text>
+                    </View>
+                  </View>
+                </ScrollView>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
       </SafeAreaView>
     );
   }
@@ -178,6 +288,9 @@ const s = StyleSheet.create({
   diffPill: { backgroundColor: colors.primarySoft, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
   diffPillText: { color: colors.primary, fontWeight: '700', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
   closeBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+  infoBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: colors.infoSoft, alignItems: 'center', justifyContent: 'center' },
+  rulesModalBg: { flex: 1, backgroundColor: 'rgba(15,15,15,0.55)', alignItems: 'center', justifyContent: 'center', padding: 22 },
+  rulesModal: { backgroundColor: colors.surface, borderRadius: radius.xl, padding: 22, width: '100%', maxWidth: 380 },
 
   scoreCard: { width: '100%', borderRadius: radius.xl, padding: 22, alignItems: 'center' },
 });

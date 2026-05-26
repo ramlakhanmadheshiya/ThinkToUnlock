@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '../../src/components/Icon';
 import { BrutalButton, Heading } from '../../src/components/Brutal';
+import { TabHeader } from '../../src/components/TabHeader';
 import { GAMES } from '../../src/data/games';
 import { colors, shadow, radius } from '../../src/theme';
 
@@ -19,9 +20,10 @@ export default function GamesTab() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
       <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
+        <TabHeader />
         <View style={{ marginBottom: 16 }}>
           <Heading level={1}>Brain Challenges</Heading>
-          <Text style={s.sub}>Pass with 60% to earn time. Pick a game and difficulty.</Text>
+          <Text style={s.sub}>Pass the challenges to earn time. Pick a game and difficulty.</Text>
         </View>
 
         <BrutalButton
@@ -45,7 +47,7 @@ export default function GamesTab() {
               style={[s.cardWrap, shadow.card, !g.implemented && { opacity: 0.55 }]}
             >
               <View style={[s.iconBox, { backgroundColor: g.color + '22' }]}>
-                <Text style={{ fontSize: 30 }}>{g.icon}</Text>
+                <Ionicons name={g.icon as any} size={28} color={g.color} />
               </View>
               <Text style={s.gName} numberOfLines={1}>{g.name}</Text>
               <Text style={s.gDesc} numberOfLines={2}>{g.description}</Text>

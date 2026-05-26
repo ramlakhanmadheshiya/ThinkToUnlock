@@ -1,24 +1,25 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, Modal, KeyboardAvoidingView, Platform, TouchableOpacity, TouchableWithoutFeedback, Alert, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter, useSegments } from 'expo-router';
 import { Ionicons } from '../../src/components/Icon';
 import { BrutalButton, BrutalCard, BrutalInput, Heading } from '../../src/components/Brutal';
+import { TabHeader } from '../../src/components/TabHeader';
 import { useAppState } from '../../src/store/StateContext';
+import { checkUsagePermission, requestUsagePermission, checkOverlayPermission, requestOverlayPermission } from '../../src/native/AppManager';
 import { colors, shadow, radius } from '../../src/theme';
 
 const PREMIUM_FEATURES: { id: string; route: string; icon: string; title: string; desc: string }[] = [
   { id: 'daily', route: '/premium-daily', icon: 'time-outline', title: 'Daily Time Top-Up', desc: 'Auto-deposit time into specific apps every day at a chosen hour. Treated as a separate allowance.' },
   { id: 'quota', route: '/premium-quota', icon: 'trophy-outline', title: 'Minimum Daily Quota', desc: 'Force N challenges before any locked app can open. With per-app exclude list (e.g. WhatsApp).' },
   { id: 'focus', route: '/premium-focus', icon: 'school-outline', title: 'Strict Focus Mode', desc: 'Define no-unlock hours. Time earned during these hours stays in the wallet for later.' },
-  { id: 'pass', route: '/premium-pass-rate', icon: 'speedometer-outline', title: 'Custom Pass Rates', desc: 'Raise required passing score for games from 60% up to 95%.' },
+  { id: 'pass', route: '/premium-pass-rate', icon: 'speedometer-outline', title: 'Custom Pass Rates', desc: 'Raise required passing score for games from 5% up to 100%.' },
   { id: 'weekly', route: '/premium-weekly', icon: 'calendar-outline', title: 'Weekly Time Top-Up', desc: 'Bonus time on Sat/Sun, auto-resets Monday 12 AM.' },
 ];
 
 export default function SettingsTab() {
   const router = useRouter();
-  const { state, setParentPassword, resetAll, setSmartReminders } = useAppState();
-  const [unlocked, setUnlocked] = useState(false);
+  const { state, setParentPassword, resetAll, setSmartReminders, settingsUnlocked, setSettingsUnlocked } = useAppState();
   const [gatePw, setGatePw] = useState('');
   const [gateErr, setGateErr] = useState('');
   const [showChange, setShowChange] = useState(false);
@@ -28,19 +29,39 @@ export default function SettingsTab() {
   const [npw2, setNpw2] = useState('');
   const [err, setErr] = useState('');
   const [resetPw, setResetPw] = useState('');
+  const [hasUsageAccess, setHasUsageAccess] = useState(false);
+  const [hasOverlayAccess, setHasOverlayAccess] = useState(false);
 
-  useFocusEffect(useCallback(() => () => {
-    setUnlocked(false); setGatePw(''); setGateErr('');
-    setShowChange(false); setShowReset(false);
+  const segments = useSegments();
+
+  useFocusEffect(useCallback(() => {
+    checkUsagePermission().then(setHasUsageAccess).catch(console.warn);
+    checkOverlayPermission().then(setHasOverlayAccess).catch(console.warn);
+  }, []));
+
+  useEffect(() => {
+    // Lock settings only when navigating to a different tab, not when opening premium screens
+    if (segments[0] === '(tabs)' && segments[1] !== 'settings') {
+      setSettingsUnlocked(false);
+    }
+  }, [segments, setSettingsUnlocked]);
+
+  useFocusEffect(useCallback(() => {
+    // Only cleanup modals and gate error, but DO NOT lock on blur
+    return () => {
+      setGatePw(''); setGateErr('');
+      setShowChange(false); setShowReset(false);
+    };
   }, []));
 
   const tryUnlock = () => {
-    if (gatePw === state.parentPassword) { setUnlocked(true); setGateErr(''); setGatePw(''); }
+    if (gatePw === state.parentPassword) { setSettingsUnlocked(true); setGateErr(''); setGatePw(''); }
     else setGateErr('Wrong password');
   };
 
   const submitChange = async () => {
     if (cur !== state.parentPassword) { setErr('Current password is wrong'); return; }
+    if (npw === cur) { setErr('New password cannot be the same as current password'); return; }
     if (npw.length < 4) { setErr('New password must be at least 4 characters'); return; }
     if (npw !== npw2) { setErr('New passwords do not match'); return; }
     await setParentPassword(npw);
@@ -55,11 +76,12 @@ export default function SettingsTab() {
     router.replace('/setup-password');
   };
 
-  if (!unlocked) {
+  if (!settingsUnlocked) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView contentContainerStyle={{ padding: 22, paddingTop: 32 }} keyboardShouldPersistTaps="handled">
+            <TabHeader />
             <View style={s.gateIcon}><Ionicons name="lock-closed" size={28} color={colors.primary} /></View>
             <Heading level={1} style={{ marginTop: 18 }}>Settings Locked</Heading>
             <Text style={s.sub}>Enter the parent password to access settings.</Text>
@@ -78,12 +100,13 @@ export default function SettingsTab() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
       <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
+        <TabHeader />
         <View style={s.titleRow}>
           <View style={{ flex: 1 }}>
             <Heading level={1}>Settings</Heading>
             <Text style={s.sub}>Manage password and app preferences.</Text>
           </View>
-          <TouchableOpacity onPress={() => setUnlocked(false)} style={s.lockBtn} testID="settings-lock-btn" activeOpacity={0.7}>
+          <TouchableOpacity onPress={() => setSettingsUnlocked(false)} style={s.lockBtn} testID="settings-lock-btn" activeOpacity={0.7}>
             <Ionicons name="lock-closed" size={20} color={colors.text} />
           </TouchableOpacity>
         </View>
@@ -92,6 +115,9 @@ export default function SettingsTab() {
         <RowAction icon="key-outline" title="Change parent password" subtitle="Update the gate password" onPress={() => setShowChange(true)} testID="settings-change-pw-btn" />
 
         <Text style={s.section}>App Preferences</Text>
+
+
+
         <View style={[s.row, shadow.card]} testID="smart-reminders-row">
           <View style={s.rowIcon}><Ionicons name="notifications-outline" size={20} color={colors.text} /></View>
           <View style={{ flex: 1, marginLeft: 12 }}>
@@ -109,29 +135,35 @@ export default function SettingsTab() {
           <Text style={s.premHint}>{state.isPremium ? 'Premium active — all features unlocked.' : 'Tap any feature to upgrade.'}</Text>
         </View>
 
-        {PREMIUM_FEATURES.map((f) => (
-          <TouchableOpacity
-            key={f.id}
-            testID={`premium-feature-${f.id}`}
-            activeOpacity={0.7}
-            onPress={() => state.isPremium ? router.push(f.route as never) : router.push('/premium')}
-            style={[s.row, shadow.card]}
-          >
-            <View style={[s.rowIcon, { backgroundColor: colors.premiumSoft }]}>
-              <Ionicons name={f.icon} size={20} color={colors.premium} />
-            </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={s.rowTitle}>{f.title}</Text>
-                <Ionicons name="star" size={11} color={colors.premium} />
+        {PREMIUM_FEATURES.map((f) => {
+          const go = () => {
+            if (!state.isPremium) { router.push('/premium' as any); return; }
+            router.push(f.route as any);
+          };
+          return (
+            <TouchableOpacity
+              key={f.id}
+              testID={`premium-feature-${f.id}`}
+              activeOpacity={0.7}
+              onPress={go}
+              style={[s.row, shadow.card]}
+            >
+              <View style={[s.rowIcon, { backgroundColor: colors.premiumSoft }]}>
+                <Ionicons name={f.icon as any} size={20} color={colors.premium} />
               </View>
-              <Text style={s.rowSub} numberOfLines={2}>{f.desc}</Text>
-            </View>
-            {state.isPremium
-              ? <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
-              : <Ionicons name="lock-closed" size={16} color={colors.premium} />}
-          </TouchableOpacity>
-        ))}
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={s.rowTitle}>{f.title}</Text>
+                  <Ionicons name="star" size={11} color={colors.premium} />
+                </View>
+                <Text style={s.rowSub} numberOfLines={2}>{f.desc}</Text>
+              </View>
+              {state.isPremium
+                ? <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
+                : <Ionicons name="lock-closed" size={16} color={colors.premium} />}
+            </TouchableOpacity>
+          );
+        })}
 
         {!state.isPremium && (
           <BrutalButton

@@ -1,33 +1,40 @@
-import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Switch, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import React, { useCallback, useState, useEffect } from 'react';
+import { View, Text, ScrollView, StyleSheet, Switch, KeyboardAvoidingView, Platform, TouchableOpacity, Image, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '../../src/components/Icon';
 import { BrutalButton, BrutalCard, BrutalInput, Heading } from '../../src/components/Brutal';
+import { TabHeader } from '../../src/components/TabHeader';
 import { useAppState } from '../../src/store/StateContext';
-import { MOCK_APPS } from '../../src/data/mockApps';
+
 import { colors, shadow, radius } from '../../src/theme';
 
 export default function ManageTab() {
-  const { state, toggleAppLock } = useAppState();
+  const { state, toggleAppLock, installedApps } = useAppState();
   const [unlocked, setUnlocked] = useState(false);
   const [pw, setPw] = useState('');
   const [err, setErr] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  useFocusEffect(useCallback(() => () => { setUnlocked(false); setPw(''); setErr(''); }, []));
+  useFocusEffect(useCallback(() => () => { setUnlocked(false); setPw(''); setErr(''); setSearchQuery(''); }, []));
 
   const tryUnlock = () => {
     if (pw === state.parentPassword) { setUnlocked(true); setErr(''); setPw(''); }
     else setErr('Wrong password');
   };
 
+  const filteredApps = installedApps.filter(app => 
+    app.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   if (!unlocked) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView contentContainerStyle={{ padding: 22, paddingTop: 32 }} keyboardShouldPersistTaps="handled">
+            <TabHeader />
             <View style={s.gateIcon}><Ionicons name="lock-closed" size={28} color={colors.primary} /></View>
-            <Heading level={1} style={{ marginTop: 18 }}>Parent Gate</Heading>
+            <Heading level={1} style={{ marginTop: 18 }}>Manage App Locked</Heading>
             <Text style={s.sub}>Enter the parent password to manage app shielding.</Text>
             <BrutalCard style={{ marginTop: 22 }}>
               <Text style={s.label}>Parent password</Text>
@@ -44,6 +51,7 @@ export default function ManageTab() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
       <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
+        <TabHeader />
         <View style={s.titleRow}>
           <View style={{ flex: 1 }}>
             <Heading level={1}>App Shielding</Heading>
@@ -54,13 +62,35 @@ export default function ManageTab() {
           </TouchableOpacity>
         </View>
 
+        <Text style={s.section}>Search Apps</Text>
+        <View style={s.searchContainer}>
+          <Ionicons name="search" size={18} color={colors.textMuted} />
+          <TextInput
+            style={s.searchInput}
+            placeholder="Search apps..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor={colors.textMuted}
+            testID="manage-search-input"
+          />
+          {searchQuery !== '' && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} testID="manage-search-clear">
+              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+
         <Text style={s.section}>All Apps</Text>
 
-        {MOCK_APPS.map((app) => {
-          const cfg = state.apps[app.id];
+        {filteredApps.map((app) => {
+          const cfg = state.apps[app.id] || { locked: false };
           return (
             <View key={app.id} style={[s.row, shadow.card]} testID={`manage-row-${app.id}`}>
-              <View style={[s.icon, { backgroundColor: app.color + '22' }]}><Text style={{ fontSize: 22 }}>{app.icon}</Text></View>
+              {app.icon.startsWith('data:image') ? (
+                <Image source={{ uri: app.icon }} style={{ width: 44, height: 44, borderRadius: 12 }} />
+              ) : (
+                <View style={[s.icon, { backgroundColor: app.color + '22' }]}><Text style={{ fontSize: 22 }}>{app.icon}</Text></View>
+              )}
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={s.appName}>{app.name}</Text>
                 <Text style={s.appSub}>{cfg.locked ? 'Locked' : 'Unlocked'}</Text>
@@ -70,7 +100,10 @@ export default function ManageTab() {
           );
         })}
 
-        <Text style={s.tip}>💡 Premium features (daily top-up, focus mode, weekly bonus, etc.) have their own app managers in Settings → Premium.</Text>
+        <View style={s.tipRow}>
+          <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
+          <Text style={s.tip}>Premium features (daily top-up, focus mode, weekly bonus, etc.) have their own app managers in Settings → Premium.</Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -88,5 +121,8 @@ const s = StyleSheet.create({
   icon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   appName: { fontWeight: '600', fontSize: 15, color: colors.text },
   appSub: { fontWeight: '500', fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  tip: { fontSize: 12, color: colors.textMuted, marginTop: 16, lineHeight: 18, fontStyle: 'italic', paddingHorizontal: 6 },
+  tipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 16, paddingHorizontal: 6 },
+  tip: { fontSize: 12, color: colors.textMuted, lineHeight: 18, fontStyle: 'italic', flex: 1 },
+  searchContainer: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16, borderWidth: 1, borderColor: colors.border },
+  searchInput: { flex: 1, color: colors.text, fontWeight: '500', fontSize: 14 },
 });

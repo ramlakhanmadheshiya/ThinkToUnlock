@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Modal, TouchableWithoutFeedback, Switch } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Modal, TouchableWithoutFeedback, Switch, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '../src/components/Icon';
 import { ManagerHeader } from '../src/components/ManagerHeader';
 import { BrutalButton, BrutalCard, BrutalInput, Heading } from '../src/components/Brutal';
 import { useAppState } from '../src/store/StateContext';
-import { MOCK_APPS } from '../src/data/mockApps';
+
 import { colors, shadow, radius } from '../src/theme';
 
 export default function PremiumQuota() {
-  const { state, setMinDailyChallenges, setQuotaExcludeApps } = useAppState();
+  const { state, setMinDailyChallenges, setQuotaExcludeApps, installedApps } = useAppState();
   const [showEdit, setShowEdit] = useState(false);
   const [val, setVal] = useState(String(state.minDailyChallenges));
 
@@ -27,17 +27,23 @@ export default function PremiumQuota() {
         <BrutalCard style={{ marginTop: 16, alignItems: 'center', backgroundColor: colors.premium }}>
           <Text style={{ color: 'rgba(255,255,255,0.85)', fontWeight: '600', fontSize: 12, letterSpacing: 0.5 }}>QUOTA / DAY</Text>
           <Text style={{ color: '#fff', fontWeight: '700', fontSize: 60, letterSpacing: -2, lineHeight: 64, marginTop: 4 }} testID="quota-value">{state.minDailyChallenges}</Text>
-          <BrutalButton title={state.minDailyChallenges === 0 ? 'Set quota' : 'Edit quota'} onPress={() => { setVal(String(state.minDailyChallenges)); setShowEdit(true); }} bg="#fff" fg={colors.premium} small testID="quota-edit-btn" style={{ marginTop: 8 }} />
+          <TouchableOpacity onPress={() => { setVal(String(state.minDailyChallenges)); setShowEdit(true); }} style={{ marginTop: 12, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>{state.minDailyChallenges === 0 ? 'Set quota' : 'Edit quota'}</Text>
+          </TouchableOpacity>
         </BrutalCard>
 
         <Text style={s.section}>Excluded apps (always allowed)</Text>
         <Text style={s.helper}>Tap to toggle. These apps bypass the daily quota — useful for emergency calls or messaging.</Text>
 
-        {MOCK_APPS.map((app) => {
+        {installedApps.map((app) => {
           const isEx = state.quotaExcludeApps.includes(app.id);
           return (
             <View key={app.id} style={[s.row, shadow.card]} testID={`quota-row-${app.id}`}>
-              <View style={[s.icon, { backgroundColor: app.color + '22' }]}><Text style={{ fontSize: 22 }}>{app.icon}</Text></View>
+              {app.icon.startsWith('data:image') ? (
+                <Image source={{ uri: app.icon }} style={{ width: 44, height: 44, borderRadius: 12 }} />
+              ) : (
+                <View style={[s.icon, { backgroundColor: app.color + '22' }]}><Ionicons name={app.icon as any} size={22} color={app.color} /></View>
+              )}
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={s.name}>{app.name}</Text>
                 <Text style={s.sub}>{isEx ? 'Excluded — always allowed' : 'Subject to quota'}</Text>

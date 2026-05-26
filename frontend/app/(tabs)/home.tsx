@@ -1,22 +1,23 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Modal, TouchableWithoutFeedback } from 'react-native';
+import React, { useState, useMemo, useEffect } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Modal, TouchableWithoutFeedback, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '../../src/components/Icon';
 import { BrutalCard, BrutalButton, BrutalIconButton, Heading } from '../../src/components/Brutal';
 import { useAppState } from '../../src/store/StateContext';
-import { MOCK_APPS } from '../../src/data/mockApps';
+
 import { inFocusWindow } from '../../src/store/storage';
+import { launchApp } from '../../src/native/AppManager';
 import { colors, shadow, radius } from '../../src/theme';
 
 type WarnKind = 'open-no-time' | 'plus-no-wallet' | 'quota' | 'focus' | null;
 
 export default function HomeTab() {
   const router = useRouter();
-  const { state } = useAppState();
+  const { state, installedApps } = useAppState();
   const [warn, setWarn] = useState<{ kind: WarnKind; appId?: string }>({ kind: null });
 
-  const lockedApps = useMemo(() => MOCK_APPS.filter((a) => state.apps[a.id]?.locked), [state.apps]);
+  const lockedApps = useMemo(() => installedApps.filter((a) => state.apps[a.id]?.locked), [state.apps, installedApps]);
   const closeWarn = () => setWarn({ kind: null });
 
   const quotaBlocks = (appId: string) =>
@@ -31,7 +32,7 @@ export default function HomeTab() {
     if (quotaBlocks(appId)) { setWarn({ kind: 'quota', appId }); return; }
     const total = cfg.timeRemainingSec + cfg.dailyTopupSec + cfg.weeklyTopupSec;
     if (total <= 0) { setWarn({ kind: 'open-no-time', appId }); return; }
-    router.push({ pathname: '/app-locked', params: { appId } });
+    launchApp(appId);
   };
 
   const onTryAdd = (appId: string) => {
@@ -40,7 +41,7 @@ export default function HomeTab() {
     return true;
   };
 
-  const warnApp = warn.appId ? MOCK_APPS.find((a) => a.id === warn.appId) : null;
+  const warnApp = warn.appId ? installedApps.find((a) => a.id === warn.appId) : null;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
@@ -159,8 +160,21 @@ const AppCard: React.FC<{
   const mins = Math.floor(totalSec / 60);
   const secs = totalSec % 60;
 
-  const add = async () => { if (!guardAdd()) return; await consumeWalletMinutesToApp(appId, 5); };
-  const sub = async () => { if (cfg.timeRemainingSec < 60) return; await refundAppMinutesToWallet(appId, 5); };
+  const add = async () => { 
+    if (!guardAdd()) return; 
+    const minsToAdd = state.timeWalletMinutes >= 5 ? 5 : state.timeWalletMinutes;
+    if (minsToAdd > 0) {
+      await consumeWalletMinutesToApp(appId, minsToAdd); 
+    }
+  };
+  const sub = async () => { 
+    if (cfg.timeRemainingSec < 60) return; 
+    const haveMins = Math.floor(cfg.timeRemainingSec / 60);
+    const minsToSub = haveMins >= 5 ? 5 : haveMins;
+    if (minsToSub > 0) {
+      await refundAppMinutesToWallet(appId, minsToSub); 
+    }
+  };
 
   const breakdown = (cfg.dailyTopupSec > 0 || cfg.weeklyTopupSec > 0) ? [
     cfg.timeRemainingSec > 0 ? `${Math.floor(cfg.timeRemainingSec / 60)}m wallet` : null,
@@ -171,7 +185,11 @@ const AppCard: React.FC<{
   return (
     <View style={[s.appCard, shadow.card]} testID={`app-card-${appId}`}>
       <TouchableOpacity activeOpacity={0.7} onPress={onOpen} style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }} testID={`app-open-${appId}`}>
-        <View style={[s.appIcon, { backgroundColor: color + '22' }]}><Text style={{ fontSize: 26 }}>{icon}</Text></View>
+        {icon.startsWith('data:image') ? (
+          <Image source={{ uri: icon }} style={{ width: 50, height: 50, borderRadius: 14 }} />
+        ) : (
+          <View style={[s.appIcon, { backgroundColor: color + '22' }]}><Ionicons name={icon as any} size={26} color={color} /></View>
+        )}
         <View style={{ flex: 1, marginLeft: 12 }}>
           <Text style={s.appNameTxt}>{appName}</Text>
           <Text style={[s.appTime, totalSec > 0 ? { color: colors.success } : null]} testID={`app-time-${appId}`}>

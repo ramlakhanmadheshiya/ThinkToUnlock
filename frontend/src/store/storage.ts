@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MOCK_APPS } from '../data/mockApps';
+
 import { Difficulty } from '../data/games';
 
 const KEY = 'thinktounlock:v2';
@@ -16,10 +16,11 @@ export type AppCfg = {
   defaultDailyMinutes: number;  // legacy compat — no longer primary
   daily: DailyConfig | null;    // per-app daily auto top-up schedule
   weeklyMinutes: number;        // weekend bonus minutes
-  isStrictFocus: boolean;       // belongs to strict-focus pool
+  weeklyDays: number[];         // days of the week (0=Sun, 1=Mon, etc) to apply bonus
+  isStrictFocus: boolean;       // legacy — use FocusWindow.lockedAppIds instead
 };
 
-export type FocusWindow = { id: string; startMin: number; endMin: number; label: string };
+export type FocusWindow = { id: string; startMin: number; endMin: number; label: string; lockedAppIds: string[] };
 
 export type AppState = {
   parentPassword: string | null;
@@ -43,7 +44,7 @@ export type HistoryEntry = {
   id: string;
   gameId: string;
   gameName: string;
-  difficulty: Difficulty;
+  difficulty: Difficulty | string;
   minutesAdded: number;
   passed: boolean;
   timestamp: number;
@@ -77,27 +78,36 @@ const defaultAppCfg = (locked: boolean): AppCfg => ({
   defaultDailyMinutes: 0,
   daily: null,
   weeklyMinutes: 0,
+  weeklyDays: [0, 6], // default Saturday & Sunday
   isStrictFocus: false,
 });
 
 export const defaultState = (): AppState => {
-  const apps: AppState['apps'] = {};
-  for (const a of MOCK_APPS) {
-    const lockedByDefault = ['instagram', 'tiktok', 'youtube', 'pubg', 'snapchat', 'reddit', 'twitter', 'netflix'].includes(a.id);
-    apps[a.id] = defaultAppCfg(lockedByDefault);
-  }
   return {
     parentPassword: null,
     timeWalletMinutes: 0,
     dailyChallengesCompleted: 0,
     lastChallengeResetDate: todayStr(),
-    apps,
+    apps: {},
     history: [],
     isPremium: false,
     smartRemindersEnabled: true,
     passRatePercent: 60,
     minDailyChallenges: 0,
-    quotaExcludeApps: ['whatsapp', 'telegram'],
+    quotaExcludeApps: [
+      'com.android.phone',
+      'com.android.server.telecom',
+      'com.android.contacts',
+      'com.android.mms',
+      'com.samsung.android.dialer',
+      'com.samsung.android.contacts',
+      'com.samsung.android.messaging',
+      'com.google.android.dialer',
+      'com.google.android.contacts',
+      'com.google.android.apps.messaging',
+      'com.whatsapp',
+      'org.telegram.messenger'
+    ],
     focusWindows: [],
     lastWeeklyKey: '',
   };
@@ -107,49 +117,57 @@ export const defaultState = (): AppState => {
 export function applySchedules(state: AppState): AppState {
   const now = new Date();
   const today = todayStr();
+  let changed = false;
+  let apps = state.apps;
+
   // Daily challenges reset
   if (state.lastChallengeResetDate !== today) {
-    state.dailyChallengesCompleted = 0;
-    state.lastChallengeResetDate = today;
+    changed = true;
   }
 
-  // Daily top-ups (premium): for each app with a `daily` config, if scheduled time has passed
-  // today and lastApplied is older than today's scheduled time, set dailyTopupSec = minutes*60.
+  // Daily top-ups (premium)
   if (state.isPremium) {
-    for (const id of Object.keys(state.apps)) {
-      const a = state.apps[id];
+    for (const id of Object.keys(apps)) {
+      const a = apps[id];
       if (!a.daily) continue;
       const scheduled = new Date(now.getFullYear(), now.getMonth(), now.getDate(), a.daily.hour, a.daily.minute, 0, 0).getTime();
       if (now.getTime() >= scheduled && a.daily.lastApplied < scheduled) {
-        a.dailyTopupSec = a.daily.minutes * 60;
-        a.daily.lastApplied = now.getTime();
+        if (apps === state.apps) apps = { ...state.apps };
+        apps[id] = { ...a, dailyTopupSec: a.daily.minutes * 60, daily: { ...a.daily, lastApplied: now.getTime() } };
+        changed = true;
       }
     }
   }
 
-  // Weekly top-up: on Sat/Sun, if not yet applied this weekend → set weeklyTopupSec.
-  // On Mon-Fri, reset weeklyTopupSec to 0 and clear lastWeeklyKey.
+  // Weekly top-up
   if (state.isPremium) {
-    if (isWeekend(now)) {
-      const wk = weekKey(now);
-      if (state.lastWeeklyKey !== wk) {
-        for (const id of Object.keys(state.apps)) {
-          const a = state.apps[id];
-          if (a.weeklyMinutes > 0) a.weeklyTopupSec = a.weeklyMinutes * 60;
+    const todayDay = now.getDay();
+    const wk = todayStr();
+    if (state.lastWeeklyKey !== wk) {
+      for (const id of Object.keys(apps)) {
+        const a = apps[id];
+        if (!a.weeklyMinutes || a.weeklyMinutes <= 0) continue; // skip apps with no weekly config
+        const days = a.weeklyDays || [0, 6];
+        const newVal = days.includes(todayDay) ? a.weeklyMinutes * 60 : 0;
+        if (a.weeklyTopupSec !== newVal) {
+          if (apps === state.apps) apps = { ...state.apps };
+          apps[id] = { ...a, weeklyTopupSec: newVal };
+          changed = true;
         }
-        state.lastWeeklyKey = wk;
       }
-    } else {
-      for (const id of Object.keys(state.apps)) state.apps[id].weeklyTopupSec = 0;
-      state.lastWeeklyKey = '';
+      changed = true; // lastWeeklyKey changes
     }
   }
 
-  // Migrate any new mock apps
-  for (const a of MOCK_APPS) {
-    if (!state.apps[a.id]) state.apps[a.id] = defaultAppCfg(false);
-  }
-  return state;
+  if (!changed) return state; // no changes — return same reference
+
+  return {
+    ...state,
+    apps,
+    dailyChallengesCompleted: state.lastChallengeResetDate !== today ? 0 : state.dailyChallengesCompleted,
+    lastChallengeResetDate: today,
+    lastWeeklyKey: state.isPremium ? todayStr() : state.lastWeeklyKey,
+  };
 }
 
 export async function loadState(): Promise<AppState> {
@@ -184,9 +202,10 @@ export async function resetAll(): Promise<void> {
 export const minsOfDay = (d = new Date()) => d.getHours() * 60 + d.getMinutes();
 export const inFocusWindow = (state: AppState, appId: string): boolean => {
   if (!state.isPremium) return false;
-  if (!state.apps[appId]?.isStrictFocus) return false;
   const m = minsOfDay();
   return state.focusWindows.some((w) => {
+    // Only lock if app is in this specific window's list
+    if (!w.lockedAppIds || !w.lockedAppIds.includes(appId)) return false;
     if (w.startMin <= w.endMin) return m >= w.startMin && m < w.endMin;
     // wrap past midnight
     return m >= w.startMin || m < w.endMin;

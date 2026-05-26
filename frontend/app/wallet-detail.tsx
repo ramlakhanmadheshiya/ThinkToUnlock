@@ -1,15 +1,16 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '../src/components/Icon';
 import { BrutalButton, BrutalCard, Heading } from '../src/components/Brutal';
 import { useAppState } from '../src/store/StateContext';
+import { GAMES } from '../src/data/games';
 import { colors, shadow, radius } from '../src/theme';
 
 export default function WalletDetail() {
   const router = useRouter();
-  const { state } = useAppState();
+  const { state, installedApps } = useAppState();
 
   const fmtTime = (ts: number) => {
     const d = new Date(ts);
@@ -17,6 +18,45 @@ export default function WalletDetail() {
     const isToday = d.toDateString() === today.toDateString();
     if (isToday) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     return d.toLocaleDateString([], { day: '2-digit', month: 'short' });
+  };
+
+  type FilterType = 'All' | 'Wins' | 'Losses' | 'Top-Ups' | 'Refunds' | 'Easy' | 'Medium' | 'Hard';
+  const [filter, setFilter] = useState<FilterType>('All');
+  const FILTERS: FilterType[] = ['All', 'Wins', 'Losses', 'Top-Ups', 'Refunds', 'Easy', 'Medium', 'Hard'];
+
+  const filteredHistory = useMemo(() => {
+    return state.history.filter(h => {
+      if (filter === 'All') return true;
+      if (filter === 'Wins') return !h.gameId.startsWith('wallet') && h.passed;
+      if (filter === 'Losses') return !h.gameId.startsWith('wallet') && !h.passed;
+      if (filter === 'Top-Ups') return h.gameId === 'wallet-add';
+      if (filter === 'Refunds') return h.gameId === 'wallet-sub';
+      if (filter === 'Easy') return h.difficulty === 'easy';
+      if (filter === 'Medium') return h.difficulty === 'medium';
+      if (filter === 'Hard') return h.difficulty === 'hard';
+      return true;
+    });
+  }, [state.history, filter]);
+
+  const counts = useMemo(() => ({
+    All: state.history.length,
+    Wins: state.history.filter(h => !h.gameId.startsWith('wallet') && h.passed).length,
+    Losses: state.history.filter(h => !h.gameId.startsWith('wallet') && !h.passed).length,
+    'Top-Ups': state.history.filter(h => h.gameId === 'wallet-add').length,
+    Refunds: state.history.filter(h => h.gameId === 'wallet-sub').length,
+    Easy: state.history.filter(h => h.difficulty === 'easy').length,
+    Medium: state.history.filter(h => h.difficulty === 'medium').length,
+    Hard: state.history.filter(h => h.difficulty === 'hard').length,
+  }), [state.history]);
+
+  const getAppIcon = (gameName: string) => {
+    const app = installedApps.find(a => a.name === gameName);
+    return app;
+  };
+
+  const getGameIcon = (gameId: string) => {
+    const game = GAMES.find(g => g.id === gameId);
+    return game;
   };
 
   return (
@@ -48,25 +88,56 @@ export default function WalletDetail() {
         <Text style={s.section}>History</Text>
         <Text style={s.sub}>Last 200 plays</Text>
 
-        {state.history.length === 0 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 12 }}>
+          {FILTERS.map(f => (
+            <TouchableOpacity 
+              key={f} 
+              onPress={() => setFilter(f)} 
+              activeOpacity={0.7}
+              style={[s.filterPill, filter === f && s.filterPillActive]}
+            >
+              <Text style={[s.filterText, filter === f && s.filterTextActive]}>{f} ({counts[f]})</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {filteredHistory.length === 0 ? (
           <BrutalCard style={{ marginTop: 12 }}>
-            <Text style={{ fontWeight: '500', color: colors.textMuted }}>No history yet. Play your first brain game.</Text>
+            <Text style={{ fontWeight: '500', color: colors.textMuted }}>No history found for this filter.</Text>
           </BrutalCard>
         ) : (
-          state.history.map((h) => (
-            <View key={h.id} style={[s.row, shadow.card]} testID={`history-row-${h.id}`}>
-              <View style={[s.iconBox, { backgroundColor: h.passed ? colors.successSoft : colors.errorSoft }]}>
-                <Ionicons name={h.passed ? 'checkmark' : 'close'} size={20} color={h.passed ? colors.success : colors.error} />
+          filteredHistory.map((h) => {
+            const isWalletTx = h.gameId.startsWith('wallet');
+            const app = isWalletTx ? getAppIcon(h.gameName) : null;
+            const game = !isWalletTx ? getGameIcon(h.gameId) : null;
+            
+            return (
+              <View key={h.id} style={[s.row, shadow.card]} testID={`history-row-${h.id}`}>
+                <View style={[s.iconBox, { backgroundColor: isWalletTx ? (h.gameId === 'wallet-add' ? colors.successSoft : colors.warnSoft) : (h.passed ? colors.successSoft : colors.errorSoft) }]}>
+                  {isWalletTx ? (
+                    app && app.icon.startsWith('data:image') ? (
+                      <Image source={{ uri: app.icon }} style={{ width: 28, height: 28, borderRadius: 6 }} />
+                    ) : app ? (
+                      <Ionicons name={app.icon as any} size={18} color={app.color} />
+                    ) : (
+                      <Ionicons name={h.gameId === 'wallet-sub' ? 'arrow-undo' : 'arrow-redo'} size={18} color={h.gameId === 'wallet-add' ? colors.success : colors.warn} />
+                    )
+                  ) : game && game.icon ? (
+                    <Ionicons name={game.icon as any} size={22} color={game.color} />
+                  ) : (
+                    <Ionicons name={h.passed ? 'checkmark' : 'close'} size={18} color={h.passed ? colors.success : colors.error} />
+                  )}
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={{ fontWeight: '600', color: colors.text, fontSize: 14 }}>{h.gameName}</Text>
+                  <Text style={{ fontWeight: '500', color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+                    {h.gameId.startsWith('wallet') ? `${h.difficulty} · ${h.minutesAdded > 0 ? '+' : ''}${h.minutesAdded} min` : `${h.difficulty} · ${h.passed ? `+${h.minutesAdded} min` : 'Failed'}`}
+                  </Text>
+                </View>
+                <Text style={{ fontWeight: '600', color: colors.textMuted, fontSize: 12 }}>{fmtTime(h.timestamp)}</Text>
               </View>
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={{ fontWeight: '600', color: colors.text, fontSize: 14 }}>{h.gameName}</Text>
-                <Text style={{ fontWeight: '500', color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-                  {h.difficulty} · {h.passed ? `+${h.minutesAdded} min` : 'Failed'}
-                </Text>
-              </View>
-              <Text style={{ fontWeight: '600', color: colors.textMuted, fontSize: 12 }}>{fmtTime(h.timestamp)}</Text>
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
     </SafeAreaView>
@@ -86,4 +157,8 @@ const s = StyleSheet.create({
     marginTop: 10,
   },
   iconBox: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  filterPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: 'transparent' },
+  filterPillActive: { backgroundColor: colors.primarySoft, borderColor: colors.primary },
+  filterText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
+  filterTextActive: { color: colors.primary },
 });
